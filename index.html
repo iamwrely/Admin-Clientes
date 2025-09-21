@@ -232,6 +232,11 @@
     .sidebar-list li button.btn{align-self:flex-start}
     .auth-controls{gap:12px}
     .sidebar input,.sidebar select{border:1px solid var(--input-border);background:var(--input-bg);color:var(--ink)}
+    .sidebar-search{position:relative;display:flex;align-items:center}
+    .sidebar-search-icon{position:absolute;left:14px;display:flex;align-items:center;justify-content:center;color:var(--muted);pointer-events:none;font-size:16px}
+    .sidebar-search input{padding-left:42px}
+    .sidebar-search:focus-within .sidebar-search-icon{color:var(--ink)}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
     .btn.ghost:hover,.btn.ghost:focus-visible{background:var(--ghost-hover-bg);border-color:var(--ghost-hover-border)}
     .btn.ghost:active{background:var(--ghost-active-bg);border-color:var(--ghost-active-border)}
     .pill{border:1px solid var(--border)}
@@ -274,8 +279,11 @@
       <nav aria-label="Controles principales">
         <ul class="sidebar-list">
           <li>
-            <label class="label" for="q">Buscar</label>
-            <input id="q" placeholder="Buscar por nombre, email o servicio…"/>
+            <div class="sidebar-search">
+              <span class="sidebar-search-icon" aria-hidden="true">🔍</span>
+              <label class="sr-only" for="q">Buscar</label>
+              <input id="q" placeholder="Buscar por nombre, email o servicio…"/>
+            </div>
           </li>
           <li>
             <label class="label" for="filterEstado">Estado</label>

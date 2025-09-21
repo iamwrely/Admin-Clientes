@@ -24,10 +24,22 @@
     .toolbar-inner{max-width:980px;margin:0 auto;padding:10px 12px;display:flex;gap:8px;align-items:center}
     .toolbar input,.toolbar select{padding:10px 12px;border-radius:10px;border:1px solid var(--ghost-border);background:#fff;min-width:200px}
     .spacer{flex:1}
-    .btn{border:0;border-radius:12px;padding:10px 14px;cursor:pointer;font-weight:600}
+    .btn{border:0;border-radius:12px;padding:10px 14px;cursor:pointer;font-weight:600;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .2s ease,color .2s ease}
     .btn.ghost{background:var(--ghost);border:1px solid var(--ghost-border);}
     .btn.primary{background:var(--btn);color:var(--btn-ink)}
-    .linklike{background:none;border:0;color:var(--link);cursor:pointer;padding:0;font-weight:600}
+    .btn:hover,.btn:focus-visible{box-shadow:0 8px 16px rgba(15,36,26,.12);transform:translateY(-1px)}
+    .btn:active{transform:translateY(0);box-shadow:0 4px 10px rgba(15,36,26,.16)}
+    .btn.ghost:hover,.btn.ghost:focus-visible{background:#f8fafc;border-color:#cbd5e1}
+    .btn.ghost:active{background:#f1f5f9;border-color:#cbd5e1}
+    .btn.primary:hover,.btn.primary:focus-visible{background:#1b1d1f}
+    .btn.primary:active{background:#151719}
+    .btn:focus-visible{outline:2px solid rgba(37,99,235,.35);outline-offset:2px}
+    .linklike{background:none;border:0;color:var(--link);cursor:pointer;padding:0;font-weight:600;position:relative;transition:color .2s ease}
+    .linklike::after{content:"";position:absolute;left:0;bottom:-2px;width:100%;height:2px;background:currentColor;transform:scaleX(0);transform-origin:left;transition:transform .2s ease}
+    .linklike:hover,.linklike:focus-visible{color:#1d4ed8}
+    .linklike:hover::after,.linklike:focus-visible::after{transform:scaleX(1)}
+    .linklike:active{color:#1e3a8a}
+    .linklike:active::after{transform:scaleX(1)}
 
     /* ===== Layout ===== */
     .wrap{max-width:980px;margin:0 auto;padding:28px 18px 60px}
@@ -37,7 +49,10 @@
     /* ===== Servicio centrado ===== */
     .center{display:flex;justify-content:center;align-items:center;gap:10px;margin:8px 0 20px}
     .center .label{color:var(--ink-soft)}
-    .addserv{border:1px dashed var(--border);background:#fff;padding:8px 10px;border-radius:10px;font-size:14px;min-width:40px;text-align:center}
+    .addserv{border:1px dashed var(--border);background:#fff;padding:8px 10px;border-radius:10px;font-size:14px;min-width:40px;text-align:center;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .2s ease,color .2s ease}
+    .addserv:hover,.addserv:focus-visible{background:#f8fafc;border-color:#cbd5e1;box-shadow:0 6px 12px rgba(15,36,26,.08);transform:translateY(-1px)}
+    .addserv:active{background:#eef2f6;border-color:#cbd5e1;transform:translateY(0);box-shadow:0 3px 6px rgba(15,36,26,.12)}
+    .addserv:focus-visible{outline:2px solid rgba(37,99,235,.35);outline-offset:2px}
     .addserv.remove{border-color:#fecaca;color:#7f1d1d}
 
     /* ===== Form (labels arriba) ===== */

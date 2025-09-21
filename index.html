@@ -249,11 +249,9 @@
     .tag.bad{color:var(--bad);background:rgba(251,113,133,.2);border-color:rgba(251,113,133,.4)}
 
     /* ===== Kebab ⋯ menú ===== */
-    .menu-wrap{position:relative;display:inline-block}
-    .kebab{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);border-radius:12px;padding:6px 10px;cursor:pointer;line-height:1;color:var(--ink);transition:background-color .2s ease,border-color .2s ease}
-    .kebab .dots{letter-spacing:2px;font-size:18px;color:var(--ink-soft)}
-    .kebab:focus{outline:2px solid rgba(125,211,252,.35)}
-    .kebab:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28)}
+    .menu-wrap{position:relative;display:inline-flex;align-items:center;gap:8px}
+    .row-menu-indicator{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.05);border-radius:12px;padding:6px 10px;line-height:1;color:var(--ink-soft);font-size:18px;letter-spacing:2px;transition:background-color .2s ease,border-color .2s ease,color .2s ease;user-select:none}
+    tr[aria-expanded="true"] .row-menu-indicator{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:var(--ink)}
     .menu{position:absolute;right:0;top:calc(100% + 8px);background:rgba(10,14,22,.96);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);min-width:180px;padding:8px;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(-6px);transition:opacity .2s ease,transform .2s ease;z-index:50;backdrop-filter:blur(18px)}
     .menu.open{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0)}
     .menu-item{display:block;width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:10px;padding:10px 12px;cursor:pointer;font-size:14px;color:var(--ink);transition:background-color .15s ease,border-color .15s ease,color .15s ease}
@@ -351,7 +349,7 @@
                 <span class="theme-btn-label label">Tema: <span id="themeLabel">Oscuro</span></span>
                 <span class="theme-btn-icon" aria-hidden="true">▾</span>
               </button>
-              <div class="menu" id="themeMenu" role="menu">
+              <div class="menu" id="themeMenu" role="menu" aria-hidden="true">
                 <button class="menu-item" type="button" role="menuitemradio" data-theme-option="dark" aria-checked="true">Oscuro</button>
                 <button class="menu-item" type="button" role="menuitemradio" data-theme-option="light" aria-checked="false">Claro</button>
               </div>
@@ -1454,7 +1452,7 @@ async function renderTabla(){
     const tag=est==='vigente'?'ok':est==='pronto'?'warn':'bad';
     const estTxt=est?est[0].toUpperCase()+est.slice(1):'-';
     const diasTxt= d==null?'-':(d<0?`Vencido ${Math.abs(d)} d`:`Faltan ${d} d`);
-    return `<tr>
+    return `<tr class="has-row-menu" tabindex="0" aria-haspopup="menu" aria-expanded="false">
       <td data-label="Nombre">${esc(x.nombre)}</td>
       <td data-label="Email">${esc(x.email||'')}</td>
       <td data-label="Servicio">${esc(x.servicio||'')}</td>
@@ -1464,8 +1462,8 @@ async function renderTabla(){
       <td data-label="Días">${diasTxt}</td>
       <td data-label="Acciones" class="cell-actions">
         <div class="menu-wrap">
-          <button class="kebab" data-menu-toggle aria-haspopup="menu" aria-expanded="false"><span class="dots">⋯</span></button>
-          <div class="menu" role="menu">
+          <div class="row-menu-indicator" aria-hidden="true"><span class="dots">⋯</span></div>
+          <div class="menu" role="menu" aria-hidden="true">
             <button class="menu-item" role="menuitem" data-action="edit" data-id="${x.id}">✎ Editar</button>
             <button class="menu-item" role="menuitem" data-action="label" data-id="${x.id}">🏷 Etiqueta</button>
             <button class="menu-item danger" role="menuitem" data-action="delete" data-id="${x.id}">🗑 Eliminar</button>
@@ -1604,11 +1602,33 @@ async function borrar(id){
 }
 
 /* Menús (kebab + tema) */
+function getMenuController(menu){
+  if(!menu) return null;
+  const wrap=menu.closest('.menu-wrap');
+  if(wrap){
+    const control=wrap.querySelector('[aria-haspopup="menu"]');
+    if(control) return control;
+  }
+  return menu.closest('tr[aria-haspopup="menu"]');
+}
+function setMenuState(menu,isOpen){
+  if(!menu) return;
+  if(isOpen){
+    menu.classList.add('open');
+    menu.setAttribute('aria-hidden','false');
+  }else{
+    menu.classList.remove('open');
+    menu.setAttribute('aria-hidden','true');
+  }
+  const controller=getMenuController(menu);
+  if(controller){
+    controller.setAttribute('aria-expanded',isOpen?'true':'false');
+  }
+}
 function closeAllMenus(except=null){
   document.querySelectorAll('.menu.open').forEach(menu=>{
     if(except && menu===except) return;
-    menu.classList.remove('open');
-    menu.previousElementSibling?.setAttribute('aria-expanded','false');
+    setMenuState(menu,false);
   });
 }
 
@@ -1616,24 +1636,24 @@ document.addEventListener('click',(e)=>{
   const wrap=e.target.closest('.menu-wrap');
   const toggle=e.target.closest('[data-menu-toggle]');
   const item=e.target.closest('.menu-item');
+  const rowTrigger=e.target.closest('tr.has-row-menu');
 
-  if(!wrap && !item){
-    closeAllMenus();
+  if(toggle){
+    const menu=toggle.closest('.menu-wrap')?.querySelector('.menu');
+    if(!menu) return;
+    const isOpen=menu.classList.contains('open');
+    if(isOpen){
+      setMenuState(menu,false);
+    }else{
+      closeAllMenus(menu);
+      setMenuState(menu,true);
+    }
     return;
   }
 
-  if(toggle){
-    const menu=toggle.nextElementSibling;
-    if(!menu || !menu.classList.contains('menu')) return;
-    const isOpen=menu.classList.contains('open');
-    if(isOpen){
-      menu.classList.remove('open');
-      toggle.setAttribute('aria-expanded','false');
-    }else{
-      closeAllMenus(menu);
-      menu.classList.add('open');
-      toggle.setAttribute('aria-expanded','true');
-    }
+  if(!wrap && !item && !rowTrigger){
+    closeAllMenus();
+    return;
   }
 
   if(item){
@@ -1648,6 +1668,40 @@ document.addEventListener('click',(e)=>{
     closeAllMenus();
   }
 });
+
+if(tbody){
+  tbody.addEventListener('click',(e)=>{
+    const row=e.target.closest('tr.has-row-menu');
+    if(!row || !tbody.contains(row)) return;
+    if(e.target.closest('.menu')) return;
+    const menu=row.querySelector('.menu');
+    if(!menu) return;
+    const isOpen=menu.classList.contains('open');
+    if(isOpen){
+      setMenuState(menu,false);
+    }else{
+      closeAllMenus(menu);
+      setMenuState(menu,true);
+    }
+  });
+  tbody.addEventListener('keydown',(e)=>{
+    if(e.key!=='Enter' && e.key!==' ') return;
+    const row=e.target.closest('tr.has-row-menu');
+    if(!row || !tbody.contains(row)) return;
+    const menu=row.querySelector('.menu');
+    if(!menu) return;
+    e.preventDefault();
+    const isOpen=menu.classList.contains('open');
+    if(isOpen){
+      setMenuState(menu,false);
+    }else{
+      closeAllMenus(menu);
+      setMenuState(menu,true);
+      const first=menu.querySelector('.menu-item');
+      first?.focus();
+    }
+  });
+}
 
 document.addEventListener('keydown',(e)=>{
   if(e.key==='Escape') closeAllMenus();

@@ -1275,31 +1275,41 @@ async function applyUpdateCommand(cmd){
 function formatDM(iso){ if(!iso) return ''; var d=new Date(iso+'T00:00:00'); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
 function buildEtiqueta(c){
   const svc = (c.servicio || '').toString().toUpperCase();
-  const fi = formatDM(c.inicio) || '--/--';
   const fv = formatDM(c.vence) || '--/--';
   const correo = c.email || '—';
   const perfil = c.nombre || '—';
   const pin = c.pin || '—';
   const password = c.password || c.contrasena || c.pass || c.clave || '—';
-  const notas = (c.notas || '').trim() || 'Sin notas adicionales.';
+  const recommendationMessages = [
+    'Si conoces a alguien que necesite un impulso digital, cuéntale de nuestros servicios 💌',
+    '¿Te gustó la experiencia? Recomiéndanos con tus amigos y colegas 🤝',
+    'Comparte tu experiencia con quien necesite soluciones creativas como estas ✨',
+    'Ayúdanos a llegar más lejos recomendando nuestros servicios cuando puedas 🚀',
+  ];
+  const motivationMessages = [
+    'Hoy es un gran día para cumplir otra meta, ¡vamos con todo! 💪',
+    'Confía en tu talento, lo que viene será todavía mejor 🌟',
+    'Respira hondo y recuerda que cada paso cuenta, ¡ánimo! 🌈',
+    'Tu esfuerzo está abriendo puertas increíbles, sigue brillando ✨',
+  ];
+  const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const recommendation = pickRandom(recommendationMessages);
+  const motivation = pickRandom(motivationMessages);
 
-  const etiqueta = `🍃 *${svc || 'SERVICIO'}*
-━━━━━━━━━━━━━━━━━━
-🗓️ *Inicio:* ${fi}
+  const etiqueta = `🌈✨ *${svc || 'SERVICIO'}* ✨🌈
+━━━━━━━━━━━━━━━━━━━━
 📅 *Vence:* ${fv}
 
-👤 *Perfil*
+👥 *Perfil & Acceso*
    • Nombre: ${perfil}
    • Correo: ${correo}
-
-🔐 *Acceso*
-   • PIN: ${pin}
    • Contraseña: ${password}
+   • PIN: ${pin}
+━━━━━━━━━━━━━━━━━━━━
 
-📝 *Notas*
-${notas}
-
-💻📲  🌟 Gracias por tu compra`;
+🙏 Gracias por tu compra
+💡 ${recommendation}
+🌞 ${motivation}`;
 
   // Probado manualmente: el texto se copia correctamente (copyToClipboard) y conserva el formato en WhatsApp.
   return etiqueta;

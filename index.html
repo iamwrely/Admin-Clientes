@@ -181,6 +181,14 @@
     .pin-wrap .eye:hover,.pin-wrap .eye:focus-visible{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.28)}
     .pin-wrap .eye:focus-visible{outline:2px solid rgba(125,211,252,.35);outline-offset:2px}
 
+    .linked-email-wrap{display:flex;gap:10px;align-items:center}
+    .linked-email-wrap input{flex:1}
+    .btn.icon-only{width:44px;height:44px;padding:0;display:flex;align-items:center;justify-content:center;font-size:24px;line-height:1}
+    .btn.ghost.danger{color:var(--danger);border-color:rgba(249,113,113,.4)}
+    .btn.ghost.danger:hover,.btn.ghost.danger:focus-visible{background:rgba(249,113,113,.18);border-color:rgba(249,113,113,.45)}
+    .btn.ghost.danger:active{background:rgba(249,113,113,.24);border-color:rgba(249,113,113,.5)}
+    .btn.ghost.danger:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;transform:none}
+
     .row.suggestion-source{position:relative}
     .suggestion-dropdown{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--menu-bg);border:1px solid var(--ghost-border);border-radius:14px;padding:6px 0;box-shadow:var(--shadow);display:none;z-index:40;max-height:260px;overflow:auto}
     .suggestion-dropdown.open{display:block}
@@ -534,7 +542,10 @@
         </div>
         <div class="row">
           <label for="linkedEmail">Correo</label>
-          <input id="linkedEmail" type="email" placeholder="correo@ejemplo.com" autocomplete="off">
+          <div class="linked-email-wrap">
+            <input id="linkedEmail" type="email" placeholder="correo@ejemplo.com" autocomplete="off">
+            <button class="btn ghost danger icon-only" id="btnLinkedDelete" type="button" aria-label="Eliminar correo enlazado">−</button>
+          </div>
         </div>
         <div class="row">
           <label for="linkedPassword">Contraseña</label>
@@ -1020,6 +1031,7 @@ const btnLinkedOpen = document.getElementById('btnLinkedOpen');
 const btnLinkedHeaderClose = document.getElementById('btnLinkedHeaderClose');
 const btnLinkedCancel = document.getElementById('btnLinkedCancel');
 const btnLinkedSave = document.getElementById('btnLinkedSave');
+const btnLinkedDelete = document.getElementById('btnLinkedDelete');
 const linkedServiceEl = document.getElementById('linkedService');
 const linkedEmailEl = document.getElementById('linkedEmail');
 const linkedPasswordEl = document.getElementById('linkedPassword');
@@ -1033,11 +1045,13 @@ function applyLinkedAccountToForm(servicio){
     linkedPasswordEl.type = 'password';
   }
   if(toggleLinkedPassword) toggleLinkedPassword.textContent = '👁';
+  if(btnLinkedDelete) btnLinkedDelete.disabled = true;
   if(!servicio) return;
   const existing = linkedAccounts.find(item => item.servicio === servicio);
   if(existing){
     if(linkedEmailEl) linkedEmailEl.value = existing.email;
     if(linkedPasswordEl) linkedPasswordEl.value = existing.password;
+    if(btnLinkedDelete) btnLinkedDelete.disabled = false;
   }
 }
 
@@ -1069,6 +1083,7 @@ async function populateLinkedServices(){
     if(linkedPasswordEl){ linkedPasswordEl.value=''; linkedPasswordEl.disabled = true; linkedPasswordEl.type='password'; }
     if(btnLinkedSave) btnLinkedSave.disabled = true;
     if(toggleLinkedPassword) toggleLinkedPassword.textContent = '👁';
+    if(btnLinkedDelete) btnLinkedDelete.disabled = true;
     if(linkedErrorEl) linkedErrorEl.textContent = 'Agrega servicios para enlazar correos.';
     return;
   }
@@ -1078,6 +1093,7 @@ async function populateLinkedServices(){
   if(linkedPasswordEl){ linkedPasswordEl.disabled = false; linkedPasswordEl.type='password'; }
   if(btnLinkedSave) btnLinkedSave.disabled = false;
   if(toggleLinkedPassword) toggleLinkedPassword.textContent = '👁';
+  if(btnLinkedDelete) btnLinkedDelete.disabled = true;
   if(linkedErrorEl) linkedErrorEl.textContent = '';
 
   const placeholder = document.createElement('option');
@@ -1143,6 +1159,43 @@ toggleLinkedPassword?.addEventListener('click', ()=>{
   const isPass = linkedPasswordEl.type==='password';
   linkedPasswordEl.type = isPass? 'text':'password';
   toggleLinkedPassword.textContent = isPass? '🙈':'👁';
+});
+
+btnLinkedDelete?.addEventListener('click', ()=>{
+  if(!linkedServiceEl) return;
+  const servicio = linkedServiceEl.value;
+  if(linkedErrorEl) linkedErrorEl.textContent='';
+  if(!servicio){
+    if(linkedErrorEl) linkedErrorEl.textContent = 'Selecciona un servicio.';
+    linkedServiceEl.focus();
+    return;
+  }
+  const idx = linkedAccounts.findIndex(item => item.servicio === servicio);
+  if(idx < 0){
+    applyLinkedAccountToForm(servicio);
+    toast('No hay correo enlazado para eliminar.');
+    return;
+  }
+
+  linkedAccounts.splice(idx, 1);
+  linkedAccounts = saveLinkedAccounts(linkedAccounts);
+  updateLinkedAccountsFrom(linkedAccounts);
+  handleEmailSuggestionSelection();
+
+  const refresh = populateLinkedServices();
+  Promise.resolve(refresh).finally(()=>{
+    const currentService = linkedServiceEl?.value || '';
+    applyLinkedAccountToForm(currentService);
+    if(linkedServiceEl && !linkedServiceEl.disabled){
+      if(currentService && linkedEmailEl && !linkedEmailEl.disabled){
+        linkedEmailEl.focus();
+      }else{
+        linkedServiceEl.focus();
+      }
+    }
+  });
+
+  toast('Correo enlazado eliminado ✓');
 });
 
 btnLinkedSave?.addEventListener('click', ()=>{

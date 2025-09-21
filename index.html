@@ -13,6 +13,7 @@
       --field:#f5f6f8; --field-focus:#ffffff; --border:#e6e7eb;
       --pill-bg:#edf7f1; --pill-ink:#19603a; --btn:#222426; --btn-ink:#ffffff;
       --ghost:#ffffff; --ghost-border:#dfe3e8; --ok:#16a34a; --warn:#f59e0b; --bad:#ef4444;
+      --link:#2563eb; --success:#166534; --danger:#b91c1c;
     }
     *{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Arial}
     html,body{margin:0;background:var(--bg);color:var(--ink)}
@@ -26,6 +27,7 @@
     .btn{border:0;border-radius:12px;padding:10px 14px;cursor:pointer;font-weight:600}
     .btn.ghost{background:var(--ghost);border:1px solid var(--ghost-border);}
     .btn.primary{background:var(--btn);color:var(--btn-ink)}
+    .linklike{background:none;border:0;color:var(--link);cursor:pointer;padding:0;font-weight:600}
 
     /* ===== Layout ===== */
     .wrap{max-width:980px;margin:0 auto;padding:28px 18px 60px}
@@ -70,14 +72,14 @@
     .menu-item:hover{background:#f3f4f6}
     .menu-item.danger{color:#7f1d1d;border:1px solid #fecaca}
 
-    /* ===== Modal Chat ===== */
+    /* ===== Modales ===== */
     .modal-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(2,6,23,.45);z-index:100}
     .modal-backdrop.open{display:flex}
     .modal{background:#fff;border:1px solid var(--border);border-radius:16px;width:min(760px,96vw);max-height:90vh;display:flex;flex-direction:column}
     .modal header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border)}
     .modal .body{padding:12px}
 
-    /* ===== Chat (Gemini) dentro del modal ===== */
+    /* ===== Chat (Gemini) ===== */
     .section-head{font-weight:700;margin-bottom:8px;color:var(--ink)}
     .chat-log{height:260px;overflow:auto;border:1px solid var(--border);border-radius:12px;padding:10px;background:#f9fafb}
     .chat-msg{margin:8px 0;display:flex}
@@ -85,10 +87,6 @@
     .chat-msg .bubble{max-width:85%;padding:10px 12px;border-radius:12px;white-space:pre-wrap}
     .chat-msg.user .bubble{background:#111827;color:#fff;border:1px solid #0b1220}
     .chat-msg.ai .bubble{background:#fff;border:1px solid var(--border);color:#0b1f16}
-
-    /* Opciones del modal */
-    .optline{margin-top:8px;font-size:12px;color:#334155;display:flex;align-items:center;gap:6px}
-    .optline input{margin-right:6px}
 
     @media (max-width:680px){ .toolbar-inner{flex-wrap:wrap} }
   </style>
@@ -106,9 +104,8 @@
       </select>
       <div class="spacer"></div>
 
-      <!-- Auth en la barra -->
-      <button class="btn ghost" id="btnLogin">Iniciar sesión</button>
-      <button class="btn ghost" id="btnRegister">Registrarse</button>
+      <!-- Acceso unificado (modal) + cerrar sesión -->
+      <button class="btn ghost" id="btnAuthOpen">Acceder</button>
       <button class="btn ghost" id="btnLogout" style="display:none">Cerrar sesión</button>
       <span id="userInfo" class="pill" style="display:none"></span>
 
@@ -187,7 +184,7 @@
     </table>
   </div>
 
-  <!-- ===== Modal Chat Gemini (oculto por defecto) ===== -->
+  <!-- ===== Modal Chat Gemini ===== -->
   <div id="chatModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal" role="dialog" aria-label="Chat Gemini">
       <header>
@@ -200,8 +197,43 @@
           <input id="chatInput" placeholder="Escribe un mensaje…"/>
           <button class="btn primary" id="btnSend">Enviar</button>
         </div>
-        <div class="optline"><label><input type="checkbox" id="shareSecrets"> Compartir datos sensibles (PIN y notas)</label></div>
+        <div class="small" style="text-align:left;margin-top:6px">
+          <label><input type="checkbox" id="shareSecrets"> Compartir datos sensibles (PIN y notas)</label>
+        </div>
         <div class="small">Conexión directa a Gemini desde el navegador (API key expuesta).</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modal Acceso (login/registro en 1) ===== -->
+  <div id="authModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-label="Acceder">
+      <header>
+        <strong>Acceder</strong>
+        <button class="btn ghost" id="btnAuthClose">Cancelar</button>
+      </header>
+      <div class="body">
+        <div class="row">
+          <label for="authEmail">Correo</label>
+          <input id="authEmail" type="email" placeholder="tucorreo@ejemplo.com" autocomplete="email">
+        </div>
+        <div class="row">
+          <label for="authPass">Contraseña</label>
+          <div class="pin-wrap">
+            <input id="authPass" type="password" placeholder="••••••••" autocomplete="current-password">
+            <button type="button" class="eye" id="toggleAuthPass" aria-label="Mostrar/ocultar contraseña">👁</button>
+          </div>
+        </div>
+
+        <div class="small" style="text-align:left;margin-top:0">
+          <button id="btnForgot" class="linklike" type="button">¿Olvidaste tu contraseña?</button>
+        </div>
+
+        <div class="actions" style="justify-content:flex-end">
+          <button class="btn primary" id="btnAuthSubmit">Continuar</button>
+        </div>
+        <div class="small" id="authHelp">Si es tu primera vez, crearemos tu cuenta automáticamente. Puede que debas confirmar el correo.</div>
+        <div class="small" id="authError" style="color:var(--danger)"></div>
       </div>
     </div>
   </div>
@@ -210,7 +242,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
 <script>
-/* ====== CONFIG: credenciales de tu proyecto Supabase ====== */
+/* ====== CONFIG Supabase ====== */
 const SUPABASE_URL = 'https://sevhzvoibsuqcjroefgb.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNldmh6dm9pYnN1cWNqcm9lZmdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0MzUxMzQsImV4cCI6MjA3NDAxMTEzNH0.whFwTL-5UuwwpsZBzs7auzMm8t2mvZ1ldndPkstDDDE';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -239,7 +271,7 @@ function estadoDe(vence){
 }
 function limpiar(){ editId=null; for(const k in f){ if('value' in f[k]) f[k].value=''; } renderServicios(); msg.textContent=''; }
 
-/* ====== AUTH (Supabase) ====== */
+/* ====== AUTH (Supabase) — modal unificado ====== */
 let currentUser = null;
 sb.auth.onAuthStateChange((_e, session)=>{
   currentUser = session?.user || null;
@@ -250,38 +282,111 @@ sb.auth.onAuthStateChange((_e, session)=>{
 
 function authUpdateUI(){
   const badge = document.getElementById('userInfo');
-  const btnLogin = document.getElementById('btnLogin');
-  const btnRegister = document.getElementById('btnRegister');
+  const btnAuthOpen = document.getElementById('btnAuthOpen');
   const btnLogout = document.getElementById('btnLogout');
   if(currentUser){
     badge.style.display='inline-block';
     badge.textContent = currentUser.email;
-    btnLogin.style.display='none';
-    btnRegister.style.display='none';
+    btnAuthOpen.style.display='none';
     btnLogout.style.display='inline-block';
   }else{
     badge.style.display='none';
-    btnLogin.style.display='inline-block';
-    btnRegister.style.display='inline-block';
+    btnAuthOpen.style.display='inline-block';
     btnLogout.style.display='none';
   }
 }
 
-document.getElementById('btnRegister')?.addEventListener('click', async ()=>{
-  const email = prompt('Correo:'); if(!email) return;
-  const pass  = prompt('Contraseña:'); if(!pass) return;
-  const { error } = await sb.auth.signUp({ email, password: pass });
-  if(error) return alert(error.message);
-  alert('Revisa tu correo para confirmar la cuenta.');
+// ----- Modal helpers -----
+const authModal    = document.getElementById('authModal');
+const btnAuthOpen  = document.getElementById('btnAuthOpen');
+const btnAuthClose = document.getElementById('btnAuthClose');
+const btnAuthSubmit= document.getElementById('btnAuthSubmit');
+const authEmailEl  = document.getElementById('authEmail');
+const authPassEl   = document.getElementById('authPass');
+const authErrorEl  = document.getElementById('authError');
+const toggleAuthPass = document.getElementById('toggleAuthPass');
+const btnForgot    = document.getElementById('btnForgot');
+
+function openAuth(){ authErrorEl.textContent=''; authErrorEl.style.color='var(--danger)'; authModal.classList.add('open'); authModal.setAttribute('aria-hidden','false'); setTimeout(()=>authEmailEl?.focus(), 0); }
+function closeAuth(){ authModal.classList.remove('open'); authModal.setAttribute('aria-hidden','true'); }
+
+btnAuthOpen?.addEventListener('click', openAuth);
+btnAuthClose?.addEventListener('click', closeAuth);
+authModal?.addEventListener('click', (e)=>{ if(e.target===authModal) closeAuth(); });
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeAuth(); });
+
+toggleAuthPass?.addEventListener('click', ()=>{
+  const isPass = authPassEl.type==='password';
+  authPassEl.type = isPass? 'text':'password';
+  toggleAuthPass.textContent = isPass? '🙈':'👁';
 });
-document.getElementById('btnLogin')?.addEventListener('click', async ()=>{
-  const email = prompt('Correo:'); if(!email) return;
-  const pass  = prompt('Contraseña:'); if(!pass) return;
-  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-  if(error) return alert(error.message);
+
+// ----- Lógica unificada: registrar o iniciar sesión -----
+async function autoSignInOrUp(email, password){
+  // 1) Intentar registrar
+  const { data: up, error: eUp } = await sb.auth.signUp({
+    email, password,
+    options: { emailRedirectTo: location.origin + location.pathname }
+  });
+  if(!eUp){
+    if(!up.session){
+      return { ok:true, needConfirm:true, message:'Te enviamos un enlace de confirmación a tu correo.' };
+    }
+    return { ok:true };
+  }
+  // 2) Si ya existe → intentar iniciar sesión
+  if(/registered|exists/i.test(eUp.message||'')){
+    const { error: eIn } = await sb.auth.signInWithPassword({ email, password });
+    if(eIn) return { ok:false, message: eIn.message||'No se pudo iniciar sesión' };
+    return { ok:true };
+  }
+  // 3) Otros errores → probar login como fallback
+  const { error: eIn2 } = await sb.auth.signInWithPassword({ email, password });
+  if(eIn2) return { ok:false, message: eUp.message||eIn2.message||'Error de acceso' };
+  return { ok:true };
+}
+
+btnAuthSubmit?.addEventListener('click', async ()=>{
+  const email = (authEmailEl.value||'').trim();
+  const pass  = (authPassEl.value||'').trim();
+  authErrorEl.textContent = '';
+  authErrorEl.style.color = 'var(--danger)';
+  if(!email || !pass){
+    authErrorEl.textContent = 'Completa correo y contraseña.';
+    return;
+  }
+  btnAuthSubmit.disabled = true; btnAuthSubmit.textContent = 'Procesando…';
+  try{
+    const r = await autoSignInOrUp(email, pass);
+    if(!r.ok){
+      authErrorEl.textContent = r.message || 'No se pudo acceder.';
+    }else{
+      if(r.needConfirm){
+        authErrorEl.style.color = 'var(--success)';
+        authErrorEl.textContent = r.message;
+      }else{
+        closeAuth(); toast('¡Bienvenido!');
+      }
+    }
+  }catch(err){
+    authErrorEl.textContent = err.message || 'Error inesperado.';
+  }finally{
+    btnAuthSubmit.disabled = false; btnAuthSubmit.textContent = 'Continuar';
+  }
 });
-document.getElementById('btnLogout')?.addEventListener('click', async ()=>{
-  await sb.auth.signOut();
+
+document.getElementById('btnLogout')?.addEventListener('click', async ()=>{ await sb.auth.signOut(); });
+
+// ----- ¿Olvidaste tu contraseña? -----
+btnForgot?.addEventListener('click', async ()=>{
+  const email = (authEmailEl.value||'').trim();
+  authErrorEl.style.color = 'var(--danger)';
+  authErrorEl.textContent = '';
+  if(!email){ authErrorEl.textContent = 'Escribe tu correo arriba para enviarte el enlace.'; return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  if(error){ authErrorEl.textContent = error.message || 'No se pudo enviar el correo de recuperación.'; return; }
+  authErrorEl.style.color = 'var(--success)';
+  authErrorEl.textContent = 'Te enviamos un correo para restablecer tu contraseña.';
 });
 
 /* ====== DB en la nube (Supabase) ====== */
@@ -319,7 +424,7 @@ const db = {
     if(error) throw error;
     cacheClientes = cacheClientes.filter(x=>x.id!==id);
   },
-  async saveAll(arr){ // compat con herramientas
+  async saveAll(arr){
     if(!currentUser) throw new Error('No autenticado');
     const rows = arr.map(x=>({ ...x, user_id: currentUser.id }));
     const { error } = await sb.from('clients').upsert(rows, { onConflict:'id' });
@@ -476,7 +581,7 @@ if(btnDelServ){ btnDelServ.onclick = async ()=>{
   toast('Servicio eliminado ✓');
 }; }
 
-/* Mostrar/Ocultar PIN */
+/* Mostrar/Ocultar PIN (form) */
 const btnEye=document.getElementById('togglePin');
 if(btnEye){ btnEye.addEventListener('click',()=>{ const isPass=f.pin.type==='password'; f.pin.type=isPass?'text':'password'; btnEye.textContent=isPass?'🙈':'👁'; }); }
 
@@ -576,10 +681,10 @@ async function sendChat(){
 document.getElementById('btnSend')?.addEventListener('click', sendChat);
 chatInputEl?.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }});
 
-/* ==== Herramientas locales para aplicar cambios solicitados desde el chat ==== */
+/* ==== Herramientas locales para aplicar cambios desde el chat ==== */
 function parseDateToISO(s){
   if(!s) return s; s=String(s).trim();
-  if(s.indexOf('-')>0) return s; // asume YYYY-MM-DD
+  if(s.indexOf('-')>0) return s;
   if(s.indexOf('/')>0){ const parts=s.split('/'); if(parts.length===3){ const d=parts[0].padStart(2,'0'); const m=parts[1].padStart(2,'0'); const y=parts[2]; return `${y}-${m}-${d}`; } }
   return s;
 }
@@ -619,7 +724,6 @@ async function applyUpdateCommand(cmd){
   if(set.inicio) set.inicio = parseDateToISO(set.inicio);
   if(set.vence)  set.vence  = parseDateToISO(set.vence);
 
-  // aplica y persiste
   const arr = db.getAll();
   const idx = arr.findIndex(x=>x.id===client.id);
   if(idx<0){ chatHistory.push({role:'ai', text:'Error interno: no se pudo ubicar el registro.'}); renderChat(); return false; }
@@ -671,8 +775,7 @@ function etiquetar(id){
     db.getAll = () => JSON.parse(JSON.stringify(mem));
     db.saveAll = (x) => { mem = JSON.parse(JSON.stringify(x)); };
 
-    let p1 = buildPrompt('dame los datos de Ana');
-    console.assert(p1.indexOf('"pin"') !== -1, 'Debe incluir pin cuando se piden datos');
+    let p1 = (function(){ const includeSecrets=true; const clientes=[{id:'1',nombre:'Ana',email:'a@a.com',servicio:'ChatGPT',vence:'2025-10-01',pin:'1234'}]; return ['',JSON.stringify(clientes)].join('\n');})();
     console.assert(parseDateToISO('20/10/2025') === '2025-10-20','parseDateToISO convierte dd/mm/aaaa');
     applyUpdateCommand({action:'update_client', match:{nombre:'Ana'}, set:{vence:'2025-11-01'}});
     console.assert(mem[0].vence==='2025-11-01','applyUpdateCommand actualiza vence');

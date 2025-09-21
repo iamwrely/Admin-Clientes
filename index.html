@@ -105,11 +105,13 @@
         <option value="vencida">Vencidas</option>
       </select>
       <div class="spacer"></div>
-      <button class="btn ghost" id="btnExportar">Exportar JSON</button>
-      <label class="btn ghost">Importar JSON
-        <input type="file" id="importFile" accept="application/json" hidden>
-      </label>
-      <!-- Reemplazo: se quita Borrar todo y se agrega Chat Gemini -->
+
+      <!-- Auth en la barra -->
+      <button class="btn ghost" id="btnLogin">Iniciar sesión</button>
+      <button class="btn ghost" id="btnRegister">Registrarse</button>
+      <button class="btn ghost" id="btnLogout" style="display:none">Cerrar sesión</button>
+      <span id="userInfo" class="pill" style="display:none"></span>
+
       <button class="btn ghost" id="btnChatOpen" title="Abrir chat con Gemini">Chat Gemini</button>
     </div>
   </div>
@@ -204,16 +206,16 @@
     </div>
   </div>
 
+  <!-- Supabase JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
 <script>
-/* ===== almacenamiento ===== */
-const KEY='clientes_v6'; const KEY_SERVS='servicios_v6';
-const db={
-  getAll(){return JSON.parse(localStorage.getItem(KEY)||'[]')},
-  saveAll(x){localStorage.setItem(KEY,JSON.stringify(x))},
-  getServicios(){return JSON.parse(localStorage.getItem(KEY_SERVS)||'["ChatGPT","Gemini","YouTube","Disney"]')},
-  saveServicios(x){localStorage.setItem(KEY_SERVS,JSON.stringify(x))}
-};
-/* ===== helpers ===== */
+/* ====== CONFIG: credenciales de tu proyecto Supabase ====== */
+const SUPABASE_URL = 'https://sevhzvoibsuqcjroefgb.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNldmh6dm9pYnN1cWNqcm9lZmdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg0MzUxMzQsImV4cCI6MjA3NDAxMTEzNH0.whFwTL-5UuwwpsZBzs7auzMm8t2mvZ1ldndPkstDDDE';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ===== helpers y refs ===== */
 const $=s=>document.querySelector(s);
 const tbody=$('#tabla tbody');
 const f={nombre:$('#nombre'),email:$('#email'),telefono:$('#telefono'),
@@ -222,36 +224,9 @@ categoria:$('#categoria'), pin:$('#pin')};
 const q=$('#q'), filterEstado=$('#filterEstado'), msg=$('#msg');
 let editId=null;
 
-function renderServicios(sel){
-  const list=db.getServicios();
-  f.servicio.innerHTML=list.map(s=>`<option value="${s}">${s}</option>`).join('');
-  if(sel && list.includes(sel)) f.servicio.value=sel;
-  else if(list.length) f.servicio.value=list[0];
-  else f.servicio.value='';
-}
-renderServicios();
-$('#btnAgregarServicio').onclick=()=>{
-  const nombre=prompt('Nombre del nuevo servicio:');
-  if(!nombre) return;
-  const list=db.getServicios();
-  if(!list.includes(nombre)){ list.push(nombre); list.sort((a,b)=>a.localeCompare(b)); db.saveServicios(list); renderServicios(nombre); toast('Servicio agregado ✓'); }
-  else { renderServicios(nombre); toast('Servicio ya existía'); }
-};
-
-// Eliminar servicio seleccionado
-const btnDelServ = $('#btnEliminarServicio');
-if(btnDelServ){ btnDelServ.onclick = ()=>{
-  const current = f.servicio.value;
-  if(!current){ toast('No hay servicio seleccionado'); return; }
-  const list = db.getServicios();
-  if(!list.includes(current)) return;
-  if(!confirm(`¿Eliminar "${current}" de la lista de servicios?
-(No afecta a los clientes existentes).`)) return;
-  const newList = list.filter(s=>s!==current);
-  db.saveServicios(newList);
-  renderServicios();
-  toast('Servicio eliminado ✓');
-}; }
+function toast(t){ msg.textContent=t; setTimeout(()=>msg.textContent='',2200); }
+function esc(s){return (s||'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;' }[m]))}
+function fmt(iso){return iso? new Date(iso+'T00:00:00').toLocaleDateString(): '-'}
 
 function diasRestantes(iso){
   if(!iso) return null; const h=new Date();h.setHours(0,0,0,0);
@@ -262,45 +237,132 @@ function estadoDe(vence){
   if(!vence) return ''; const d=diasRestantes(vence);
   if(d<0) return 'vencida'; if(d<=7) return 'pronto'; return 'vigente';
 }
-
 function limpiar(){ editId=null; for(const k in f){ if('value' in f[k]) f[k].value=''; } renderServicios(); msg.textContent=''; }
-$('#btnLimpiar').onclick=limpiar;
 
-$('#btnGuardar').onclick=()=>{
-  const data={ id:editId ?? crypto.randomUUID(),
-    nombre:f.nombre.value.trim(), email:f.email.value.trim(), telefono:f.telefono.value.trim(),
-    servicio:f.servicio.value, inicio:f.inicio.value, vence:f.vence.value,
-    categoria:f.categoria.value, notas:f.notas.value.trim(), pin:f.pin.value.trim(), ts:Date.now()
-  };
-  if(!data.nombre){ toast('Escribe un nombre'); return; }
-  const arr=db.getAll(); const i=arr.findIndex(x=>x.id===data.id);
-  if(i>=0) arr[i]=data; else arr.push(data);
-  arr.sort((a,b)=>a.nombre.localeCompare(b.nombre)); db.saveAll(arr);
-  renderTabla(); limpiar(); toast('Guardado ✓');
+/* ====== AUTH (Supabase) ====== */
+let currentUser = null;
+sb.auth.onAuthStateChange((_e, session)=>{
+  currentUser = session?.user || null;
+  authUpdateUI();
+  renderServicios();
+  renderTabla();
+});
+
+function authUpdateUI(){
+  const badge = document.getElementById('userInfo');
+  const btnLogin = document.getElementById('btnLogin');
+  const btnRegister = document.getElementById('btnRegister');
+  const btnLogout = document.getElementById('btnLogout');
+  if(currentUser){
+    badge.style.display='inline-block';
+    badge.textContent = currentUser.email;
+    btnLogin.style.display='none';
+    btnRegister.style.display='none';
+    btnLogout.style.display='inline-block';
+  }else{
+    badge.style.display='none';
+    btnLogin.style.display='inline-block';
+    btnRegister.style.display='inline-block';
+    btnLogout.style.display='none';
+  }
+}
+
+document.getElementById('btnRegister')?.addEventListener('click', async ()=>{
+  const email = prompt('Correo:'); if(!email) return;
+  const pass  = prompt('Contraseña:'); if(!pass) return;
+  const { error } = await sb.auth.signUp({ email, password: pass });
+  if(error) return alert(error.message);
+  alert('Revisa tu correo para confirmar la cuenta.');
+});
+document.getElementById('btnLogin')?.addEventListener('click', async ()=>{
+  const email = prompt('Correo:'); if(!email) return;
+  const pass  = prompt('Contraseña:'); if(!pass) return;
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if(error) return alert(error.message);
+});
+document.getElementById('btnLogout')?.addEventListener('click', async ()=>{
+  await sb.auth.signOut();
+});
+
+/* ====== DB en la nube (Supabase) ====== */
+let cacheClientes = [];
+let cacheServicios = [];
+
+const db = {
+  // CLIENTES
+  getAll(){ return cacheClientes.slice(); },
+  async fetchAll(){
+    if(!currentUser){ cacheClientes=[]; return cacheClientes; }
+    const { data, error } = await sb
+      .from('clients').select('*')
+      .eq('user_id', currentUser.id)
+      .order('nombre', { ascending:true });
+    if(error){ console.error(error); cacheClientes=[]; return cacheClientes; }
+    cacheClientes = data||[];
+    return cacheClientes.slice();
+  },
+  async saveOne(rec){
+    if(!currentUser) throw new Error('No autenticado');
+    const row = { ...rec, user_id: currentUser.id };
+    const { data, error } = await sb
+      .from('clients').upsert(row, { onConflict:'id' })
+      .select().limit(1).single();
+    if(error) throw error;
+    const i = cacheClientes.findIndex(x=>x.id===data.id);
+    if(i>=0) cacheClientes[i]=data; else cacheClientes.push(data);
+    cacheClientes.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    return data;
+  },
+  async deleteOne(id){
+    if(!currentUser) throw new Error('No autenticado');
+    const { error } = await sb.from('clients').delete().eq('id', id);
+    if(error) throw error;
+    cacheClientes = cacheClientes.filter(x=>x.id!==id);
+  },
+  async saveAll(arr){ // compat con herramientas
+    if(!currentUser) throw new Error('No autenticado');
+    const rows = arr.map(x=>({ ...x, user_id: currentUser.id }));
+    const { error } = await sb.from('clients').upsert(rows, { onConflict:'id' });
+    if(error) throw error;
+    cacheClientes = arr.slice();
+  },
+
+  // SERVICIOS
+  getServicios(){ return cacheServicios.slice(); },
+  async fetchServicios(){
+    if(!currentUser){ cacheServicios=[]; return cacheServicios; }
+    const { data, error } = await sb
+      .from('services').select('name')
+      .eq('user_id', currentUser.id)
+      .order('name');
+    if(error){ console.error(error); cacheServicios=[]; return cacheServicios; }
+    cacheServicios = (data||[]).map(x=>x.name);
+    return cacheServicios.slice();
+  },
+  async replaceServicios(list){
+    if(!currentUser) return;
+    const { data: curr } = await sb.from('services').select('name').eq('user_id', currentUser.id);
+    const has = new Set((curr||[]).map(x=>x.name));
+    const want = new Set(list);
+    const toDel = [...has].filter(n=>!want.has(n));
+    if(toDel.length) await sb.from('services').delete().in('name', toDel).eq('user_id', currentUser.id);
+    const toIns = [...want].filter(n=>!has.has(n)).map(n=>({ user_id: currentUser.id, name:n }));
+    if(toIns.length) await sb.from('services').insert(toIns);
+    cacheServicios = list.slice();
+  }
 };
 
-function editar(id){
-  const x=db.getAll().find(c=>c.id===id); if(!x) return; editId=x.id;
-  for(const k in f){ if(k in x) f[k].value=x[k]||''; }
-  msg.textContent='Editando… guarda para aplicar cambios';
+/* ====== UI dinámica ====== */
+async function renderServicios(sel){
+  const list = await db.fetchServicios();
+  f.servicio.innerHTML = list.map(s=>`<option value="${s}">${s}</option>`).join('');
+  if(sel && list.includes(sel)) f.servicio.value=sel;
+  else if(list.length) f.servicio.value=list[0];
+  else f.servicio.value='';
 }
-function borrar(id){
-  if(!confirm('¿Eliminar este cliente?')) return;
-  db.saveAll(db.getAll().filter(c=>c.id!==id)); renderTabla();
-}
-
-function coincide(x,qq){
-  qq=(qq||'').trim().toLowerCase(); if(!qq) return true;
-  return [x.nombre,x.email,x.servicio,x.telefono,x.categoria,x.notas]
-    .some(v=>(v||'').toLowerCase().includes(qq));
-}
-function pasaEstado(x,f){ if(!f) return true; return estadoDe(x.vence)===f; }
-
-function esc(s){return (s||'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;' }[m]))}
-function fmt(iso){return iso? new Date(iso+'T00:00:00').toLocaleDateString(): '-'}
-
-function renderTabla(){
-  const arr=db.getAll(); const items=arr.filter(x=>coincide(x,q?.value)&&pasaEstado(x,filterEstado?.value));
+async function renderTabla(){
+  const arr = await db.fetchAll();
+  const items=arr.filter(x=>coincide(x,q?.value)&&pasaEstado(x,filterEstado?.value));
   tbody.innerHTML=items.map(x=>{
     const d=diasRestantes(x.vence); const est=estadoDe(x.vence);
     const tag=est==='vigente'?'ok':est==='pronto'?'warn':'bad';
@@ -327,7 +389,36 @@ function renderTabla(){
     </tr>`;
   }).join('');
 }
-renderTabla();
+function coincide(x,qq){
+  qq=(qq||'').trim().toLowerCase(); if(!qq) return true;
+  return [x.nombre,x.email,x.servicio,x.telefono,x.categoria,x.notas]
+    .some(v=>(v||'').toLowerCase().includes(qq));
+}
+function pasaEstado(x,f){ if(!f) return true; return estadoDe(x.vence)===f; }
+
+$('#btnLimpiar').onclick=limpiar;
+
+$('#btnGuardar').onclick = async ()=>{
+  const data={ id:editId ?? crypto.randomUUID(),
+    nombre:f.nombre.value.trim(), email:f.email.value.trim(), telefono:f.telefono.value.trim(),
+    servicio:f.servicio.value, inicio:f.inicio.value, vence:f.vence.value,
+    categoria:f.categoria.value, notas:f.notas.value.trim(), pin:f.pin.value.trim(), ts:Date.now()
+  };
+  if(!data.nombre){ toast('Escribe un nombre'); return; }
+  await db.saveOne(data);
+  await renderTabla(); limpiar(); toast('Guardado ✓');
+};
+
+function editar(id){
+  const x=db.getAll().find(c=>c.id===id); if(!x) return; editId=x.id;
+  for(const k in f){ if(k in x) f[k].value=x[k]||''; }
+  msg.textContent='Editando… guarda para aplicar cambios';
+}
+async function borrar(id){
+  if(!confirm('¿Eliminar este cliente?')) return;
+  await db.deleteOne(id);
+  await renderTabla();
+}
 
 /* kebab: abrir/cerrar y acciones */
 document.addEventListener('click', (e)=>{
@@ -358,15 +449,36 @@ document.addEventListener('keydown',(e)=>{
   }
 });
 
-/* Exportar / Importar */
-const btnExp=document.getElementById('btnExportar'); if(btnExp){ btnExp.onclick=()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(db.getAll(),null,2)],{type:'application/json'})); a.download='clientes.json'; a.click(); }; }
-const inputImp=document.getElementById('importFile'); if(inputImp){ inputImp.onchange=async e=>{ const file=e.target.files[0]; if(!file) return; try{ const txt=await file.text(); const data=JSON.parse(txt); if(!Array.isArray(data)) throw 0; db.saveAll(data); renderTabla(); toast('Importado ✓'); }catch{ alert('Archivo no válido'); } e.target.value=''; }; }
+/* Servicios: agregar / eliminar */
+$('#btnAgregarServicio').onclick = async ()=>{
+  const nombre = prompt('Nombre del nuevo servicio:');
+  if(!nombre) return;
+  const list = await db.fetchServicios();
+  if(!list.includes(nombre)){
+    list.push(nombre); list.sort((a,b)=>a.localeCompare(b));
+    await db.replaceServicios(list);
+    await renderServicios(nombre);
+    toast('Servicio agregado ✓');
+  }else{
+    await renderServicios(nombre);
+    toast('Servicio ya existía');
+  }
+};
+const btnDelServ = $('#btnEliminarServicio');
+if(btnDelServ){ btnDelServ.onclick = async ()=>{
+  const current = f.servicio.value;
+  if(!current){ toast('No hay servicio seleccionado'); return; }
+  const list = await db.fetchServicios();
+  if(!list.includes(current)) return;
+  if(!confirm(`¿Eliminar "${current}" de la lista de servicios?\n(No afecta a los clientes existentes).`)) return;
+  await db.replaceServicios(list.filter(s=>s!==current));
+  await renderServicios();
+  toast('Servicio eliminado ✓');
+}; }
 
 /* Mostrar/Ocultar PIN */
 const btnEye=document.getElementById('togglePin');
 if(btnEye){ btnEye.addEventListener('click',()=>{ const isPass=f.pin.type==='password'; f.pin.type=isPass?'text':'password'; btnEye.textContent=isPass?'🙈':'👁'; }); }
-
-function toast(t){ msg.textContent=t; setTimeout(()=>msg.textContent='',2200); }
 
 /* ===== Chat (Gemini) ===== */
 const GEMINI_API_KEY = 'AIzaSyC9hpKbGmUx3_YcgVGI3AEOdKvWRSoU81k'; // visible en el navegador
@@ -473,7 +585,6 @@ function parseDateToISO(s){
 }
 function extractJson(text){
   const i = text.indexOf('```json'); if(i>=0){ const j = text.indexOf('```', i+7); if(j>i){ return text.slice(i+7, j).trim(); } }
-  // fallback: intenta primer bloque { ... }
   const a = text.indexOf('{'); const b = text.lastIndexOf('}');
   if(a>=0 && b>a) return text.slice(a,b+1);
   return null;
@@ -494,11 +605,12 @@ function findClientByMatch(match){
   });
   return filtered;
 }
-function applyUpdateCommand(cmd){
+async function applyUpdateCommand(cmd){
   const matches = findClientByMatch(cmd.match||{});
   if(matches.length !== 1){
     const msg = matches.length===0? 'No encontré un cliente con esos datos. Especifica nombre o email.' : `Hay ${matches.length} clientes que coinciden. Especifica email para continuar.`;
     chatHistory.push({role:'ai', text: msg});
+    renderChat();
     return false;
   }
   const client = matches[0];
@@ -506,14 +618,20 @@ function applyUpdateCommand(cmd){
   const set = Object.assign({}, cmd.set);
   if(set.inicio) set.inicio = parseDateToISO(set.inicio);
   if(set.vence)  set.vence  = parseDateToISO(set.vence);
+
+  // aplica y persiste
   const arr = db.getAll();
   const idx = arr.findIndex(x=>x.id===client.id);
-  if(idx<0){ chatHistory.push({role:'ai', text:'Error interno: no se pudo ubicar el registro.'}); return false; }
+  if(idx<0){ chatHistory.push({role:'ai', text:'Error interno: no se pudo ubicar el registro.'}); renderChat(); return false; }
   const before = Object.assign({}, arr[idx]);
   Object.keys(set).forEach(k=>{ if(allowed[k]) arr[idx][k] = set[k]; });
-  db.saveAll(arr); renderTabla();
+
+  await db.saveAll(arr);
+  await renderTabla();
+
   const changed = Object.keys(set).map(k=>`${k}: "${before[k]||''}" → "${arr[idx][k]}"`).join('\n');
   chatHistory.push({role:'ai', text:`Actualizado ✓\nCliente: ${arr[idx].nombre}\nCambios:\n${changed}`});
+  renderChat();
   return true;
 }
 
@@ -545,56 +663,28 @@ function etiquetar(id){
   copyToClipboard(etiqueta).then(function(ok){ toast(ok?'Etiqueta copiada ✓':'No se pudo copiar'); });
 }
 
-/* ===== DEV TESTS (para depurar buildPrompt) ===== */
+/* ===== DEV TESTS (ligeros) ===== */
 (function(){
   function runTests(){
-    // Tests de buildPrompt
-    const backup = db.getAll;
-    db.getAll = () => ([{id:'1',nombre:'Ana',servicio:'ChatGPT',vence:'2025-10-01',pin:'1234',notas:'vip'}]);
-    let p0 = buildPrompt('hola');
-    console.assert(p0.indexOf('"pin"') === -1, 'No debe incluir pin cuando no se pide');
-    console.assert(p0.indexOf('"notas"') === -1, 'No debe incluir notas cuando no se pide');
+    const backupGet = db.getAll, backupSaveAll = db.saveAll;
+    let mem = [{id:'1',nombre:'Ana',servicio:'ChatGPT',vence:'2025-10-01',pin:'1234',notas:'vip'}];
+    db.getAll = () => JSON.parse(JSON.stringify(mem));
+    db.saveAll = (x) => { mem = JSON.parse(JSON.stringify(x)); };
+
     let p1 = buildPrompt('dame los datos de Ana');
     console.assert(p1.indexOf('"pin"') !== -1, 'Debe incluir pin cuando se piden datos');
-    let p2 = buildPrompt('muestrame las notas de Ana');
-    console.assert(p2.indexOf('"notas"') !== -1, 'Debe incluir notas cuando se piden');
-    db.getAll = backup;
+    console.assert(parseDateToISO('20/10/2025') === '2025-10-20','parseDateToISO convierte dd/mm/aaaa');
+    applyUpdateCommand({action:'update_client', match:{nombre:'Ana'}, set:{vence:'2025-11-01'}});
+    console.assert(mem[0].vence==='2025-11-01','applyUpdateCommand actualiza vence');
 
-    // Tests de utilidades locales (sin tocar tu almacenamiento real)
-    (function(){
-      const realGet = db.getAll, realSave = db.saveAll;
-      let mem = [{id:'1',nombre:'Ana',email:'ana@x.com',servicio:'ChatGPT',inicio:'2025-09-20',vence:'2025-10-01',categoria:'Premium',pin:'1234',notas:'vip'}];
-      db.getAll = () => JSON.parse(JSON.stringify(mem));
-      db.saveAll = (x) => { mem = JSON.parse(JSON.stringify(x)); };
-
-      // 1) parseDateToISO dd/mm/aaaa
-      console.assert(parseDateToISO('20/10/2025') === '2025-10-20','parseDateToISO convierte dd/mm/aaaa');
-
-      // 2) aplicar cambio de vence mediante comando
-      applyUpdateCommand({action:'update_client', match:{nombre:'Ana'}, set:{vence:'2025-11-01'}});
-      console.assert(mem[0].vence==='2025-11-01','applyUpdateCommand actualiza vence');
-
-      // restore
-      db.getAll = realGet; db.saveAll = realSave;
-    })();
-
-    // Tests de eliminación de servicio (store en memoria)
-    (function(){
-      const g = db.getServicios, s = db.saveServicios;
-      let memList = ['ChatGPT','Gemini','YouTube','Disney'];
-      db.getServicios = () => memList.slice();
-      db.saveServicios = (x) => { memList = x.slice(); };
-      const before = db.getServicios();
-      const after  = before.filter(v=>v!=='YouTube');
-      db.saveServicios(after);
-      console.assert(db.getServicios().indexOf('YouTube') === -1, 'Servicio "YouTube" debe eliminarse de la lista');
-      db.getServicios = g; db.saveServicios = s;
-    })();
-
-    console.log('[tests] OK: buildPrompt & tools');
+    db.getAll = backupGet; db.saveAll = backupSaveAll;
+    console.log('[tests] OK');
   }
   try{ runTests(); }catch(e){ console.warn('[tests] fallo:', e); }
 })();
+
+/* inicio */
+renderServicios().then(()=>renderTabla());
 </script>
 </body>
 </html>

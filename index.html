@@ -245,11 +245,11 @@
           <thead>
             <tr>
               <th>Nombre</th><th>Email</th><th>Servicio</th>
-            <th>Inicio</th><th>Vence</th><th>Estado</th><th>Días</th><th></th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+              <th>Inicio</th><th>Vence</th><th>Estado</th><th>Días</th><th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </div>
     </section>
   </div>
@@ -518,6 +518,8 @@ const db = {
     cacheClientes = data||[];
     return cacheClientes.slice();
   },
+
+  // *** saveOne robusto: UUID o BIGSERIAL ***
   async saveOne(rec){
     if(!currentUser){
       localClients = loadLocalClients();
@@ -530,16 +532,54 @@ const db = {
       cacheClientes = localClients.slice();
       return payload;
     }
-    const row = { ...rec, user_id: currentUser.id };
-    const { data, error } = await sb
-      .from('clients').upsert(row, { onConflict:'id' })
-      .select().limit(1).single();
-    if(error) throw error;
+
+    const rowNoId = {
+      user_id: currentUser.id,
+      nombre:   rec.nombre,
+      email:    rec.email,
+      telefono: rec.telefono,
+      servicio: rec.servicio,
+      inicio:   rec.inicio,
+      vence:    rec.vence,
+      categoria:rec.categoria,
+      notas:    rec.notas,
+      pin:      rec.pin,
+      ts:       rec.ts
+    };
+
+    let data, error;
+
+    if (Number.isFinite(rec.id)) {
+      ({ data, error } = await sb
+        .from('clients')
+        .update(rowNoId)
+        .eq('id', rec.id)
+        .select()
+        .single());
+    } else {
+      ({ data, error } = await sb
+        .from('clients')
+        .upsert({ ...rowNoId, id: rec.id }, { onConflict: 'id' })
+        .select()
+        .single());
+
+      if (error) {
+        ({ data, error } = await sb
+          .from('clients')
+          .insert(rowNoId)
+          .select()
+          .single());
+      }
+    }
+
+    if (error) throw error;
+
     const i = cacheClientes.findIndex(x=>x.id===data.id);
     if(i>=0) cacheClientes[i]=data; else cacheClientes.push(data);
-    cacheClientes.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    cacheClientes.sort((a,b)=> (a.nombre||'').localeCompare(b.nombre||''));
     return data;
   },
+
   async deleteOne(id){
     if(!currentUser){
       localClients = loadLocalClients().filter(x=>x && x.id!==id);
@@ -661,8 +701,11 @@ function pasaEstado(x,f){ if(!f) return true; return estadoDe(x.vence)===f; }
 
 $('#btnLimpiar').onclick=limpiar;
 
+// *** Agregar/editar cliente ***
 $('#btnGuardar').onclick = async ()=>{
-  const data={ id:editId ?? crypto.randomUUID(),
+  const isCloud = !!currentUser;
+  const data={ 
+    id: isCloud ? null : (editId ?? crypto.randomUUID()),
     nombre:f.nombre.value.trim(), email:f.email.value.trim(), telefono:f.telefono.value.trim(),
     servicio:f.servicio.value, inicio:f.inicio.value, vence:f.vence.value,
     categoria:f.categoria.value, notas:f.notas.value.trim(), pin:f.pin.value.trim(), ts:Date.now()
@@ -974,6 +1017,10 @@ function etiquetar(id){
   }
   try{ runTests(); }catch(e){ console.warn('[tests] fallo:', e); }
 })();
+
+/* ===== Listeners de búsqueda/filtro ===== */
+q?.addEventListener('input', () => renderTabla());
+filterEstado?.addEventListener('change', () => renderTabla());
 
 /* inicio */
 renderServicios().then(()=>renderTabla());

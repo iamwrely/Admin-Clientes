@@ -524,23 +524,15 @@ function buildEtiqueta(c){
   var correo=c.email||'';
   var perfil=c.nombre||'';
   var pin=c.pin||'';
-  var t='*'+svc+'* ✨ 📧✨ *FV: '+fv+'*
-';
-  t+= '*Correo:* '+correo+'
-';
-  t+= '*Contraseña:* '+'
-';
-  t+= '__________________'+'
-';
-  t+= 'Perfíl:  '+perfil+'
-';
-  t+= 'PIN:  '+pin+'
-';
-  t+= '__________________'+'
-';
-  t+= '💻📲'+'
-';
-  t+= '    🌟 Gracias por tu compra';
+  var t='*'+svc+'* ✨ 📧✨ *FV: '+fv+'*\n';
+  t+='*Correo:* '+correo+'\n';
+  t+='*Contraseña:* '+'\n';
+  t+='__________________'+'\n';
+  t+='Perfíl:  '+perfil+'\n';
+  t+='PIN:  '+pin+'\n';
+  t+='__________________'+'\n';
+  t+='💻📲'+'\n';
+  t+='    🌟 Gracias por tu compra';
   return t;
 }
 async function copyToClipboard(txt){

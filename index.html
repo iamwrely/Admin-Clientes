@@ -232,7 +232,7 @@
         <div class="actions" style="justify-content:flex-end">
           <button class="btn primary" id="btnAuthSubmit">Continuar</button>
         </div>
-        <div class="small" id="authHelp">Si es tu primera vez, crearemos tu cuenta automáticamente. Puede que debas confirmar el correo.</div>
+        <div class="small" id="authHelp">Si es tu primera vez, crearemos tu cuenta automáticamente.</div>
         <div class="small" id="authError" style="color:var(--danger)"></div>
       </div>
     </div>
@@ -339,52 +339,45 @@ toggleAuthPass?.addEventListener('click', ()=>{
 });
 
 // ----- Lógica unificada: registrar o iniciar sesión -----
-async function autoSignInOrUp(email, password){
-  const { data: up, error: eUp } = await sb.auth.signUp({
-    email, password,
-    options: { emailRedirectTo: location.origin + location.pathname }
-  });
-  if(!eUp){
-    if(!up.session){
-      return { ok:true, needConfirm:true, message:'Te enviamos un enlace de confirmación a tu correo.' };
-    }
-    return { ok:true };
+async function autoSignInOrUp(email, password) {
+  // 1) Intenta iniciar sesión primero
+  let { error } = await sb.auth.signInWithPassword({ email, password });
+  if (!error) return { ok: true };
+
+  // 2) Si falla, crea la cuenta (sin confirmación por email)
+  const { data, error: eUp } = await sb.auth.signUp({ email, password });
+  if (eUp) return { ok: false, message: eUp.message };
+
+  // 3) Por si la API no devolviera sesión, intenta loguear de nuevo
+  if (!data.session) {
+    const { error: eIn2 } = await sb.auth.signInWithPassword({ email, password });
+    if (eIn2) return { ok: false, message: eIn2.message };
   }
-  if(/registered|exists/i.test(eUp.message||'')){
-    const { error: eIn } = await sb.auth.signInWithPassword({ email, password });
-    if(eIn) return { ok:false, message: eIn.message||'No se pudo iniciar sesión' };
-    return { ok:true };
-  }
-  const { error: eIn2 } = await sb.auth.signInWithPassword({ email, password });
-  if(eIn2) return { ok:false, message: eUp.message||eIn2.message||'Error de acceso' };
-  return { ok:true };
+  return { ok: true };
 }
 
-btnAuthSubmit?.addEventListener('click', async ()=>{
-  const email = (authEmailEl.value||'').trim();
-  const pass  = (authPassEl.value||'').trim();
+btnAuthSubmit?.addEventListener('click', async () => {
+  const email = (authEmailEl.value || '').trim();
+  const pass  = (authPassEl.value || '').trim();
   authErrorEl.textContent = '';
   authErrorEl.style.color = 'var(--danger)';
-  if(!email || !pass){
+
+  if (!email || !pass) {
     authErrorEl.textContent = 'Completa correo y contraseña.';
     return;
   }
   btnAuthSubmit.disabled = true; btnAuthSubmit.textContent = 'Procesando…';
-  try{
+  try {
     const r = await autoSignInOrUp(email, pass);
-    if(!r.ok){
+    if (!r.ok) {
       authErrorEl.textContent = r.message || 'No se pudo acceder.';
-    }else{
-      if(r.needConfirm){
-        authErrorEl.style.color = 'var(--success)';
-        authErrorEl.textContent = r.message;
-      }else{
-        closeAuth(); toast('¡Bienvenido!');
-      }
+    } else {
+      closeAuth();
+      toast('¡Bienvenido!');
     }
-  }catch(err){
+  } catch (err) {
     authErrorEl.textContent = err.message || 'Error inesperado.';
-  }finally{
+  } finally {
     btnAuthSubmit.disabled = false; btnAuthSubmit.textContent = 'Continuar';
   }
 });

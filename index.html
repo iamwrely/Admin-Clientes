@@ -353,6 +353,9 @@
             <span id="userInfo" class="pill label" style="display:none"></span>
           </li>
           <li>
+            <button class="btn ghost label" id="btnLinkedOpen">Correos enlazados</button>
+          </li>
+          <li>
             <button class="btn ghost label" id="btnChatOpen" title="Abrir chat con Gemini">Chat Gemini</button>
           </li>
         </ul>
@@ -502,6 +505,38 @@
         </div>
         <div class="small" id="authHelp">Si es tu primera vez, crearemos tu cuenta automáticamente.</div>
         <div class="small" id="authError" style="color:var(--danger)"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modal Correos enlazados ===== -->
+  <div id="linkedModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-label="Correos enlazados">
+      <header>
+        <strong>Correos enlazados</strong>
+        <button class="btn ghost" id="btnLinkedHeaderClose" type="button">Cancelar</button>
+      </header>
+      <div class="body">
+        <div class="row">
+          <label for="linkedService">Servicio</label>
+          <select id="linkedService"></select>
+        </div>
+        <div class="row">
+          <label for="linkedEmail">Correo</label>
+          <input id="linkedEmail" type="email" placeholder="correo@ejemplo.com" autocomplete="off">
+        </div>
+        <div class="row">
+          <label for="linkedPassword">Contraseña</label>
+          <div class="pin-wrap">
+            <input id="linkedPassword" type="password" placeholder="••••••••" autocomplete="off">
+            <button type="button" class="eye" id="toggleLinkedPassword" aria-label="Mostrar/ocultar contraseña">👁</button>
+          </div>
+        </div>
+        <div class="small" id="linkedError" style="color:var(--danger)"></div>
+        <div class="actions" style="justify-content:flex-end">
+          <button class="btn ghost" id="btnLinkedCancel" type="button">Cancelar</button>
+          <button class="btn primary" id="btnLinkedSave" type="button">Guardar</button>
+        </div>
       </div>
     </div>
   </div>
@@ -673,6 +708,48 @@ function saveLocalClients(){
   }
 }
 
+const LINKED_ACCOUNTS_KEY = 'linked_accounts_v1';
+function loadLinkedAccounts(){
+  try {
+    const raw = localStorage.getItem(LINKED_ACCOUNTS_KEY);
+    if(!raw) return [];
+    const parsed = JSON.parse(raw);
+    if(Array.isArray(parsed)){
+      return parsed
+        .filter(item => item && typeof item === 'object')
+        .map(item => ({
+          servicio: String(item.servicio ?? '').trim(),
+          email: String(item.email ?? '').trim(),
+          password: String(item.password ?? '')
+        }))
+        .filter(item => item.servicio && item.email && item.password)
+        .sort((a,b)=>a.servicio.localeCompare(b.servicio));
+    }
+  } catch (err) {
+    console.warn('No se pudieron cargar correos enlazados', err);
+  }
+  return [];
+}
+function saveLinkedAccounts(arr){
+  try {
+    const normalized = (Array.isArray(arr)? arr:[])
+      .filter(item => item && typeof item === 'object')
+      .map(item => ({
+        servicio: String(item.servicio ?? '').trim(),
+        email: String(item.email ?? '').trim(),
+        password: String(item.password ?? '')
+      }))
+      .filter(item => item.servicio && item.email && item.password)
+      .sort((a,b)=>a.servicio.localeCompare(b.servicio));
+    localStorage.setItem(LINKED_ACCOUNTS_KEY, JSON.stringify(normalized));
+    return normalized.slice();
+  } catch (err) {
+    console.warn('No se pudieron guardar correos enlazados', err);
+  }
+  return loadLinkedAccounts();
+}
+let linkedAccounts = loadLinkedAccounts();
+
 /* ====== AUTH (Supabase) — modal unificado ====== */
 let currentUser = null;
 
@@ -724,6 +801,167 @@ toggleAuthPass?.addEventListener('click', ()=>{
   const isPass = authPassEl.type==='password';
   authPassEl.type = isPass? 'text':'password';
   toggleAuthPass.textContent = isPass? '🙈':'👁';
+});
+
+const linkedModal = document.getElementById('linkedModal');
+const btnLinkedOpen = document.getElementById('btnLinkedOpen');
+const btnLinkedHeaderClose = document.getElementById('btnLinkedHeaderClose');
+const btnLinkedCancel = document.getElementById('btnLinkedCancel');
+const btnLinkedSave = document.getElementById('btnLinkedSave');
+const linkedServiceEl = document.getElementById('linkedService');
+const linkedEmailEl = document.getElementById('linkedEmail');
+const linkedPasswordEl = document.getElementById('linkedPassword');
+const toggleLinkedPassword = document.getElementById('toggleLinkedPassword');
+const linkedErrorEl = document.getElementById('linkedError');
+
+function applyLinkedAccountToForm(servicio){
+  if(linkedEmailEl) linkedEmailEl.value = '';
+  if(linkedPasswordEl){
+    linkedPasswordEl.value = '';
+    linkedPasswordEl.type = 'password';
+  }
+  if(toggleLinkedPassword) toggleLinkedPassword.textContent = '👁';
+  if(!servicio) return;
+  const existing = linkedAccounts.find(item => item.servicio === servicio);
+  if(existing){
+    if(linkedEmailEl) linkedEmailEl.value = existing.email;
+    if(linkedPasswordEl) linkedPasswordEl.value = existing.password;
+  }
+}
+
+async function populateLinkedServices(){
+  if(!linkedServiceEl) return;
+  const previous = linkedServiceEl.value;
+  let servicios = [];
+  try {
+    servicios = await db.fetchServicios();
+  } catch (err) {
+    console.warn('No se pudieron obtener servicios para correos enlazados', err);
+  }
+  servicios = Array.from(new Set((Array.isArray(servicios)? servicios:[])
+    .filter(Boolean)
+    .map(s => String(s))
+  ));
+
+  linkedServiceEl.innerHTML = '';
+
+  if(!servicios.length){
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No hay servicios disponibles';
+    option.disabled = true;
+    option.selected = true;
+    linkedServiceEl.appendChild(option);
+    linkedServiceEl.disabled = true;
+    if(linkedEmailEl){ linkedEmailEl.value=''; linkedEmailEl.disabled = true; }
+    if(linkedPasswordEl){ linkedPasswordEl.value=''; linkedPasswordEl.disabled = true; linkedPasswordEl.type='password'; }
+    if(btnLinkedSave) btnLinkedSave.disabled = true;
+    if(toggleLinkedPassword) toggleLinkedPassword.textContent = '👁';
+    if(linkedErrorEl) linkedErrorEl.textContent = 'Agrega servicios para enlazar correos.';
+    return;
+  }
+
+  linkedServiceEl.disabled = false;
+  if(linkedEmailEl) linkedEmailEl.disabled = false;
+  if(linkedPasswordEl){ linkedPasswordEl.disabled = false; linkedPasswordEl.type='password'; }
+  if(btnLinkedSave) btnLinkedSave.disabled = false;
+  if(toggleLinkedPassword) toggleLinkedPassword.textContent = '👁';
+  if(linkedErrorEl) linkedErrorEl.textContent = '';
+
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = 'Selecciona un servicio';
+  linkedServiceEl.appendChild(placeholder);
+
+  servicios.forEach(servicio => {
+    const opt = document.createElement('option');
+    opt.value = servicio;
+    opt.textContent = servicio;
+    linkedServiceEl.appendChild(opt);
+  });
+
+  let nextValue = '';
+  if(previous && servicios.includes(previous)) nextValue = previous;
+  if(!nextValue){
+    const existing = linkedAccounts.find(item => servicios.includes(item.servicio));
+    if(existing) nextValue = existing.servicio;
+  }
+  if(!nextValue) nextValue = servicios[0] || '';
+  if(nextValue) linkedServiceEl.value = nextValue;
+
+  applyLinkedAccountToForm(linkedServiceEl.value);
+}
+
+function openLinkedModal(){
+  if(!linkedModal) return;
+  if(linkedErrorEl) linkedErrorEl.textContent='';
+  linkedModal.classList.add('open');
+  linkedModal.setAttribute('aria-hidden','false');
+  populateLinkedServices().finally(()=>{
+    setTimeout(()=>{
+      if(linkedServiceEl && !linkedServiceEl.disabled){ linkedServiceEl.focus(); return; }
+      if(linkedEmailEl && !linkedEmailEl.disabled){ linkedEmailEl.focus(); return; }
+      btnLinkedCancel?.focus();
+    },0);
+  });
+}
+
+function closeLinkedModal(){
+  if(!linkedModal) return;
+  linkedModal.classList.remove('open');
+  linkedModal.setAttribute('aria-hidden','true');
+  if(linkedPasswordEl) linkedPasswordEl.type='password';
+  if(toggleLinkedPassword) toggleLinkedPassword.textContent='👁';
+  if(linkedErrorEl) linkedErrorEl.textContent='';
+}
+
+btnLinkedOpen?.addEventListener('click', openLinkedModal);
+btnLinkedHeaderClose?.addEventListener('click', closeLinkedModal);
+btnLinkedCancel?.addEventListener('click', closeLinkedModal);
+linkedModal?.addEventListener('click', (e)=>{ if(e.target===linkedModal) closeLinkedModal(); });
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeLinkedModal(); });
+
+linkedServiceEl?.addEventListener('change', ()=>{
+  applyLinkedAccountToForm(linkedServiceEl.value);
+  if(linkedErrorEl) linkedErrorEl.textContent='';
+});
+
+toggleLinkedPassword?.addEventListener('click', ()=>{
+  if(!linkedPasswordEl) return;
+  const isPass = linkedPasswordEl.type==='password';
+  linkedPasswordEl.type = isPass? 'text':'password';
+  toggleLinkedPassword.textContent = isPass? '🙈':'👁';
+});
+
+btnLinkedSave?.addEventListener('click', ()=>{
+  if(!linkedServiceEl || !linkedEmailEl || !linkedPasswordEl) return;
+  const servicio = linkedServiceEl.value;
+  const email = linkedEmailEl.value.trim();
+  const password = linkedPasswordEl.value;
+  if(linkedErrorEl) linkedErrorEl.textContent='';
+
+  if(!servicio){
+    if(linkedErrorEl) linkedErrorEl.textContent = 'Selecciona un servicio.';
+    linkedServiceEl.focus();
+    return;
+  }
+  if(!email){
+    if(linkedErrorEl) linkedErrorEl.textContent = 'Ingresa un correo válido.';
+    linkedEmailEl.focus();
+    return;
+  }
+  if(!password){
+    if(linkedErrorEl) linkedErrorEl.textContent = 'Ingresa una contraseña.';
+    linkedPasswordEl.focus();
+    return;
+  }
+
+  const payload = { servicio, email, password };
+  const idx = linkedAccounts.findIndex(item => item.servicio === servicio);
+  if(idx>=0) linkedAccounts[idx] = payload; else linkedAccounts.push(payload);
+  linkedAccounts = saveLinkedAccounts(linkedAccounts);
+  toast('Correo enlazado guardado ✓');
+  closeLinkedModal();
 });
 
 sidebarLauncher?.addEventListener('click', ()=>{

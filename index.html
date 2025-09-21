@@ -1280,6 +1280,7 @@ function buildEtiqueta(c){
   const perfil = c.nombre || '—';
   const pin = c.pin || '—';
   const password = c.password || c.contrasena || c.pass || c.clave || '—';
+  const notas = (c.notas || '').trim() || 'Sin notas adicionales.';
   const recommendationMessages = [
     'Si conoces a alguien que necesite un impulso digital, cuéntale de nuestros servicios 💌',
     '¿Te gustó la experiencia? Recomiéndanos con tus amigos y colegas 🤝',
@@ -1296,7 +1297,7 @@ function buildEtiqueta(c){
   const recommendation = pickRandom(recommendationMessages);
   const motivation = pickRandom(motivationMessages);
 
-  const etiqueta = `🌈✨ *${svc || 'SERVICIO'}* ✨🌈
+  const etiqueta = `💖🌟 *${svc || 'SERVICIO'}* 🌟💖
 ━━━━━━━━━━━━━━━━━━━━
 📅 *Vence:* ${fv}
 
@@ -1306,6 +1307,9 @@ function buildEtiqueta(c){
    • Contraseña: ${password}
    • PIN: ${pin}
 ━━━━━━━━━━━━━━━━━━━━
+
+📝 *Notas*
+   ${notas}
 
 🙏 Gracias por tu compra
 💡 ${recommendation}

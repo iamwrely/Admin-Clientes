@@ -271,13 +271,30 @@ function estadoDe(vence){
 }
 function limpiar(){ editId=null; for(const k in f){ if('value' in f[k]) f[k].value=''; } renderServicios(); msg.textContent=''; }
 
+/* ====== Semillas / almacenamiento local de servicios (fallback si no hay sesión) ====== */
+const defaultServices = ["ChatGPT","Gemini","YouTube","Disney"];
+let localServices = JSON.parse(localStorage.getItem('services_local') || 'null');
+if (!Array.isArray(localServices) || !localServices.length) {
+  localServices = defaultServices.slice();
+  localStorage.setItem('services_local', JSON.stringify(localServices));
+}
+function saveLocalServices() {
+  localServices = Array.from(new Set(localServices))
+    .filter(Boolean)
+    .sort((a,b)=>a.localeCompare(b));
+  localStorage.setItem('services_local', JSON.stringify(localServices));
+}
+
 /* ====== AUTH (Supabase) — modal unificado ====== */
 let currentUser = null;
+
 sb.auth.onAuthStateChange((_e, session)=>{
   currentUser = session?.user || null;
   authUpdateUI();
-  renderServicios();
-  renderTabla();
+  // Sincroniza local → nube si la nube está vacía
+  syncLocalServicesToCloudIfEmpty().finally(()=>{
+    renderServicios().then(renderTabla);
+  });
 });
 
 function authUpdateUI(){
@@ -323,7 +340,6 @@ toggleAuthPass?.addEventListener('click', ()=>{
 
 // ----- Lógica unificada: registrar o iniciar sesión -----
 async function autoSignInOrUp(email, password){
-  // 1) Intentar registrar
   const { data: up, error: eUp } = await sb.auth.signUp({
     email, password,
     options: { emailRedirectTo: location.origin + location.pathname }
@@ -334,13 +350,11 @@ async function autoSignInOrUp(email, password){
     }
     return { ok:true };
   }
-  // 2) Si ya existe → intentar iniciar sesión
   if(/registered|exists/i.test(eUp.message||'')){
     const { error: eIn } = await sb.auth.signInWithPassword({ email, password });
     if(eIn) return { ok:false, message: eIn.message||'No se pudo iniciar sesión' };
     return { ok:true };
   }
-  // 3) Otros errores → probar login como fallback
   const { error: eIn2 } = await sb.auth.signInWithPassword({ email, password });
   if(eIn2) return { ok:false, message: eUp.message||eIn2.message||'Error de acceso' };
   return { ok:true };
@@ -432,37 +446,62 @@ const db = {
     cacheClientes = arr.slice();
   },
 
-  // SERVICIOS
-  getServicios(){ return cacheServicios.slice(); },
+  // ===== SERVICIOS con fallback local =====
+  getServicios(){ return currentUser ? cacheServicios.slice() : localServices.slice(); },
+
   async fetchServicios(){
-    if(!currentUser){ cacheServicios=[]; return cacheServicios; }
+    if (!currentUser) {
+      return localServices.slice();
+    }
     const { data, error } = await sb
       .from('services').select('name')
       .eq('user_id', currentUser.id)
       .order('name');
-    if(error){ console.error(error); cacheServicios=[]; return cacheServicios; }
+    if(error){ console.error(error); cacheServicios = []; return []; }
     cacheServicios = (data||[]).map(x=>x.name);
     return cacheServicios.slice();
   },
+
   async replaceServicios(list){
-    if(!currentUser) return;
-    const { data: curr } = await sb.from('services').select('name').eq('user_id', currentUser.id);
+    if (!currentUser) {
+      localServices = list.slice();
+      saveLocalServices();
+      return;
+    }
+    const { data: curr } = await sb
+      .from('services').select('name')
+      .eq('user_id', currentUser.id);
     const has = new Set((curr||[]).map(x=>x.name));
     const want = new Set(list);
     const toDel = [...has].filter(n=>!want.has(n));
-    if(toDel.length) await sb.from('services').delete().in('name', toDel).eq('user_id', currentUser.id);
+    if (toDel.length) {
+      await sb.from('services').delete().in('name', toDel).eq('user_id', currentUser.id);
+    }
     const toIns = [...want].filter(n=>!has.has(n)).map(n=>({ user_id: currentUser.id, name:n }));
-    if(toIns.length) await sb.from('services').insert(toIns);
+    if (toIns.length) {
+      await sb.from('services').insert(toIns);
+    }
     cacheServicios = list.slice();
   }
 };
 
+/* ===== Sincroniza local → nube si la nube está vacía ===== */
+async function syncLocalServicesToCloudIfEmpty(){
+  if (!currentUser) return;
+  const cloud = await db.fetchServicios();
+  if (cloud.length === 0 && localServices.length) {
+    await db.replaceServicios(localServices);
+    localStorage.removeItem('services_local');
+  }
+}
+
 /* ====== UI dinámica ====== */
 async function renderServicios(sel){
   const list = await db.fetchServicios();
-  f.servicio.innerHTML = list.map(s=>`<option value="${s}">${s}</option>`).join('');
-  if(sel && list.includes(sel)) f.servicio.value=sel;
-  else if(list.length) f.servicio.value=list[0];
+  const final = list.length ? list : defaultServices;
+  f.servicio.innerHTML = final.map(s=>`<option value="${s}">${s}</option>`).join('');
+  if(sel && final.includes(sel)) f.servicio.value=sel;
+  else if(final.length) f.servicio.value=final[0];
   else f.servicio.value='';
 }
 async function renderTabla(){
@@ -554,39 +593,55 @@ document.addEventListener('keydown',(e)=>{
   }
 });
 
-/* Servicios: agregar / eliminar */
+/* ===== Botones + y − de servicios ===== */
 $('#btnAgregarServicio').onclick = async ()=>{
-  const nombre = prompt('Nombre del nuevo servicio:');
-  if(!nombre) return;
-  const list = await db.fetchServicios();
-  if(!list.includes(nombre)){
-    list.push(nombre); list.sort((a,b)=>a.localeCompare(b));
-    await db.replaceServicios(list);
+  const nombre = (prompt('Nombre del nuevo servicio:') || '').trim();
+  if (!nombre) return;
+
+  const actuales = await db.fetchServicios();
+  if (!actuales.includes(nombre)) {
+    actuales.push(nombre);
+    actuales.sort((a,b)=>a.localeCompare(b));
+    await db.replaceServicios(actuales);
+
+    if (!currentUser) {
+      toast('Servicio agregado (local) ✓  Accede para guardar en la nube');
+    } else {
+      toast('Servicio agregado ✓');
+    }
     await renderServicios(nombre);
-    toast('Servicio agregado ✓');
-  }else{
+  } else {
     await renderServicios(nombre);
-    toast('Servicio ya existía');
+    toast('Ese servicio ya existe');
   }
 };
-const btnDelServ = $('#btnEliminarServicio');
-if(btnDelServ){ btnDelServ.onclick = async ()=>{
+
+$('#btnEliminarServicio').onclick = async ()=>{
   const current = f.servicio.value;
-  if(!current){ toast('No hay servicio seleccionado'); return; }
-  const list = await db.fetchServicios();
-  if(!list.includes(current)) return;
-  if(!confirm(`¿Eliminar "${current}" de la lista de servicios?\n(No afecta a los clientes existentes).`)) return;
-  await db.replaceServicios(list.filter(s=>s!==current));
+  if (!current) { toast('No hay servicio seleccionado'); return; }
+
+  const actuales = await db.fetchServicios();
+  if (!actuales.includes(current)) { toast('Ese servicio no está en la lista'); return; }
+
+  if (!confirm(`¿Eliminar "${current}" de la lista de servicios?\n(No afecta a los clientes ya guardados).`)) return;
+
+  const nueva = actuales.filter(s => s !== current);
+  await db.replaceServicios(nueva);
+
+  if (!currentUser) {
+    toast('Servicio eliminado (local) ✓  Accede para guardar en la nube');
+  } else {
+    toast('Servicio eliminado ✓');
+  }
   await renderServicios();
-  toast('Servicio eliminado ✓');
-}; }
+};
 
 /* Mostrar/Ocultar PIN (form) */
 const btnEye=document.getElementById('togglePin');
 if(btnEye){ btnEye.addEventListener('click',()=>{ const isPass=f.pin.type==='password'; f.pin.type=isPass?'text':'password'; btnEye.textContent=isPass?'🙈':'👁'; }); }
 
 /* ===== Chat (Gemini) ===== */
-const GEMINI_API_KEY = 'AIzaSyC9hpKbGmUx3_YcgVGI3AEOdKvWRSoU81k'; // visible en el navegador
+const GEMINI_API_KEY = 'AIzaSyC9hpKbGmUx3_YcgVGI3AEOdKvWRSoU81k';
 const GEMINI_MODEL  = 'gemini-1.5-flash';
 const chatModal = document.getElementById('chatModal');
 const btnChatOpen = document.getElementById('btnChatOpen');
@@ -775,7 +830,6 @@ function etiquetar(id){
     db.getAll = () => JSON.parse(JSON.stringify(mem));
     db.saveAll = (x) => { mem = JSON.parse(JSON.stringify(x)); };
 
-    let p1 = (function(){ const includeSecrets=true; const clientes=[{id:'1',nombre:'Ana',email:'a@a.com',servicio:'ChatGPT',vence:'2025-10-01',pin:'1234'}]; return ['',JSON.stringify(clientes)].join('\n');})();
     console.assert(parseDateToISO('20/10/2025') === '2025-10-20','parseDateToISO convierte dd/mm/aaaa');
     applyUpdateCommand({action:'update_client', match:{nombre:'Ana'}, set:{vence:'2025-11-01'}});
     console.assert(mem[0].vence==='2025-11-01','applyUpdateCommand actualiza vence');

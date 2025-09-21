@@ -652,12 +652,6 @@ function updateLinkedAccountsFrom(records){
   rebuildEmailSuggestions();
 }
 
-async function loadLinkedAccounts(){
-  const arr=await linkedAccountsStore.fetchAll();
-  updateLinkedAccountsFrom(arr);
-  return arr;
-}
-
 function getLinkedAccountsByService(servicio){
   const key=normalize(servicio||'');
   if(!key||!linkedAccountsIndex.has(key)) return [];
@@ -867,6 +861,12 @@ const linkedAccountsStore = {
     return cacheLinkedAccounts.map(x=>({ ...x }));
   }
 };
+
+async function loadLinkedAccounts(){
+  const arr=await linkedAccountsStore.fetchAll();
+  updateLinkedAccountsFrom(arr);
+  return arr;
+}
 
 sb.auth.onAuthStateChange((_e, session)=>{
   currentUser = session?.user || null;

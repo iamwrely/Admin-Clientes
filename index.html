@@ -355,6 +355,37 @@ function saveLocalServices() {
   localStorage.setItem('services_local', JSON.stringify(localServices));
 }
 
+const LOCAL_CLIENTS_KEY = 'clients_local_v1';
+function loadLocalClients(){
+  try {
+    const raw = localStorage.getItem(LOCAL_CLIENTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      const filtered = parsed
+        .filter(x => x && typeof x === 'object')
+        .map(x => ({ ...x }));
+      filtered.sort((a,b)=> (a.nombre||'').localeCompare(b.nombre||''));
+      return filtered;
+    }
+  } catch (err) {
+    console.warn('No se pudieron cargar clientes locales', err);
+  }
+  return [];
+}
+let localClients = loadLocalClients();
+function saveLocalClients(){
+  try {
+    localClients = (Array.isArray(localClients)? localClients:[])
+      .filter(x => x && typeof x === 'object')
+      .map(x => ({ ...x }))
+      .sort((a,b)=> (a.nombre||'').localeCompare(b.nombre||''));
+    localStorage.setItem(LOCAL_CLIENTS_KEY, JSON.stringify(localClients));
+  } catch (err) {
+    console.warn('No se pudieron guardar clientes locales', err);
+  }
+}
+
 /* ====== AUTH (Supabase) — modal unificado ====== */
 let currentUser = null;
 
@@ -467,14 +498,18 @@ btnForgot?.addEventListener('click', async ()=>{
 });
 
 /* ====== DB en la nube (Supabase) ====== */
-let cacheClientes = [];
+let cacheClientes = localClients.slice();
 let cacheServicios = [];
 
 const db = {
   // CLIENTES
-  getAll(){ return cacheClientes.slice(); },
+  getAll(){ return currentUser ? cacheClientes.slice() : localClients.slice(); },
   async fetchAll(){
-    if(!currentUser){ cacheClientes=[]; return cacheClientes; }
+    if(!currentUser){
+      localClients = loadLocalClients();
+      cacheClientes = localClients.slice();
+      return cacheClientes.slice();
+    }
     const { data, error } = await sb
       .from('clients').select('*')
       .eq('user_id', currentUser.id)
@@ -484,7 +519,17 @@ const db = {
     return cacheClientes.slice();
   },
   async saveOne(rec){
-    if(!currentUser) throw new Error('No autenticado');
+    if(!currentUser){
+      localClients = loadLocalClients();
+      const idx = localClients.findIndex(x=>x.id===rec.id);
+      const payload = { ...(idx>=0? localClients[idx]:{}), ...rec };
+      if(idx>=0) localClients[idx] = payload;
+      else localClients.push(payload);
+      localClients.sort((a,b)=> (a.nombre||'').localeCompare(b.nombre||''));
+      saveLocalClients();
+      cacheClientes = localClients.slice();
+      return payload;
+    }
     const row = { ...rec, user_id: currentUser.id };
     const { data, error } = await sb
       .from('clients').upsert(row, { onConflict:'id' })
@@ -496,13 +541,24 @@ const db = {
     return data;
   },
   async deleteOne(id){
-    if(!currentUser) throw new Error('No autenticado');
+    if(!currentUser){
+      localClients = loadLocalClients().filter(x=>x && x.id!==id);
+      saveLocalClients();
+      cacheClientes = localClients.slice();
+      return;
+    }
     const { error } = await sb.from('clients').delete().eq('id', id);
     if(error) throw error;
     cacheClientes = cacheClientes.filter(x=>x.id!==id);
   },
   async saveAll(arr){
-    if(!currentUser) throw new Error('No autenticado');
+    if(!currentUser){
+      localClients = arr.map(x=>({ ...x }));
+      localClients.sort((a,b)=> (a.nombre||'').localeCompare(b.nombre||''));
+      saveLocalClients();
+      cacheClientes = localClients.slice();
+      return;
+    }
     const rows = arr.map(x=>({ ...x, user_id: currentUser.id }));
     const { error } = await sb.from('clients').upsert(rows, { onConflict:'id' });
     if(error) throw error;
@@ -612,8 +668,24 @@ $('#btnGuardar').onclick = async ()=>{
     categoria:f.categoria.value, notas:f.notas.value.trim(), pin:f.pin.value.trim(), ts:Date.now()
   };
   if(!data.nombre){ toast('Escribe un nombre'); return; }
-  await db.saveOne(data);
-  await renderTabla(); limpiar(); toast('Guardado ✓');
+  const wasGuest = !currentUser;
+  try{
+    await db.saveOne(data);
+    await renderTabla();
+    limpiar();
+    if(wasGuest && !currentUser){
+      toast('Guardado local ✓  Accede para sincronizar');
+    }else{
+      toast('Guardado ✓');
+    }
+  }catch(err){
+    const msgErr = err?.message || '';
+    if(/autentic/i.test(msgErr)){
+      toast('Debes iniciar sesión para guardar en la nube.');
+    }else{
+      toast(msgErr || 'No se pudo guardar.');
+    }
+  }
 };
 
 function editar(id){

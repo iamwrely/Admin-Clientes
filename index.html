@@ -1275,18 +1275,14 @@ async function applyUpdateCommand(cmd){
 function formatDM(iso){ if(!iso) return ''; var d=new Date(iso+'T00:00:00'); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
 function buildEtiqueta(c){
   const svc = (c.servicio || '').toString().toUpperCase();
-  const fi = formatDM(c.inicio) || '--/--';
   const fv = formatDM(c.vence) || '--/--';
   const correo = c.email || '—';
   const perfil = c.nombre || '—';
   const pin = c.pin || '—';
   const password = c.password || c.contrasena || c.pass || c.clave || '—';
-  const notas = (c.notas || '').trim() || 'Sin notas adicionales.';
-
   const etiqueta = `🌈✨ *${svc || 'SERVICIO'}* ✨🌈
 ━━━━━━━━━━━━━━━━━━━━
 📅 *Vence:* ${fv}
-🗓️ *Inicio:* ${fi}
 
 👥 *Perfil & Acceso*
    • Nombre: ${perfil}
@@ -1295,10 +1291,7 @@ function buildEtiqueta(c){
    • PIN: ${pin}
 ━━━━━━━━━━━━━━━━━━━━
 
-🪄 *Notas especiales*
-   ${notas}
-
-💬✨ Lista para WhatsApp`;
+💻📲  🌟 Gracias por tu compra`;
 
   // Probado manualmente: el texto se copia correctamente (copyToClipboard) y conserva el formato en WhatsApp.
   return etiqueta;

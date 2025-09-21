@@ -1258,17 +1258,16 @@ async function applyUpdateCommand(cmd){
 
 function formatDM(iso){ if(!iso) return ''; var d=new Date(iso+'T00:00:00'); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
   function buildEtiqueta(c){
-    const svc = (c.servicio || '').toString().trim().toUpperCase() || 'SERVICIO';
+    const svc = (c.servicio ?? '').toString().trim().toUpperCase() || 'SERVICIO';
     const fv = formatDM(c.vence) || '--/--';
-    const correo = (c.email || '—').trim() || '—';
-    const perfil = (c.nombre || '—').trim() || '—';
-    const pin = (c.pin || '—').toString().trim() || '—';
-    const password = (c.password || c.contrasena || c.pass || c.clave || '—').toString().trim() || '—';
-    const notas = (c.notas || '').trim();
+    const correo = (c.email ?? '').toString().trim() || '—';
+    const perfil = (c.nombre ?? '').toString().trim() || '—';
+    const pin = (c.pin ?? '').toString().trim() || '—';
+    const password = (c.password ?? c.contrasena ?? c.pass ?? c.clave ?? '').toString().trim() || '—';
+    const notas = (c.notas ?? '').toString().trim();
 
     const notasBloque = notas
-      ? `
-📝 *Notas*
+      ? `📝 *Notas*
 ${notas}
 ━━━━━━━━━━━━`
       : '━━━━━━━━━━━━';

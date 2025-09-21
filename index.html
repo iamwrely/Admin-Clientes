@@ -181,6 +181,16 @@
     .pin-wrap .eye:hover,.pin-wrap .eye:focus-visible{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.28)}
     .pin-wrap .eye:focus-visible{outline:2px solid rgba(125,211,252,.35);outline-offset:2px}
 
+    .row.suggestion-source{position:relative}
+    .suggestion-dropdown{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--menu-bg);border:1px solid var(--ghost-border);border-radius:14px;padding:6px 0;box-shadow:var(--shadow);display:none;z-index:40;max-height:260px;overflow:auto}
+    .suggestion-dropdown.open{display:block}
+    .suggestion-item{width:100%;text-align:left;background:none;border:0;color:var(--ink);padding:10px 16px;cursor:pointer;display:flex;flex-direction:column;gap:4px;font-size:14px}
+    .suggestion-item:hover,.suggestion-item:focus-visible{background:var(--menu-hover-bg);outline:none}
+    .suggestion-item.is-active{background:var(--table-row-hover-bg);box-shadow:var(--table-row-hover-shadow)}
+    .suggestion-email{font-weight:600}
+    .suggestion-hint{color:var(--muted);font-size:12px}
+    .suggestion-empty{padding:12px 16px;color:var(--muted);font-size:13px}
+
     /* ===== Tabla ===== */
     .table-section{margin-top:40px;display:flex;flex-direction:column;gap:18px}
     .table-header{display:flex;flex-direction:column;gap:6px}
@@ -385,10 +395,10 @@
           <label for="nombre">Nombre</label>
           <input id="nombre" placeholder="Escribe"/>
         </div>
-        <div class="row">
+        <div class="row suggestion-source">
           <label for="email">Email</label>
-          <input id="email" type="email" placeholder="ej: cliente@mail.com" list="emailSuggestions"/>
-          <datalist id="emailSuggestions"></datalist>
+          <input id="email" type="email" placeholder="ej: cliente@mail.com" />
+          <div id="emailSuggestionDropdown" class="suggestion-dropdown" role="listbox" aria-hidden="true"></div>
         </div>
         <div class="row">
           <label for="telefono">Teléfono</label>
@@ -567,7 +577,11 @@ const themeMenu=document.getElementById('themeMenu');
 const themeOptions=Array.from(themeMenu?.querySelectorAll('[data-theme-option]')||[]);
 const THEME_STORAGE_KEY='ui_theme_mode_v1';
 let editId=null;
-const emailSuggestionsList=document.getElementById('emailSuggestions');
+const emailSuggestionDropdown=document.getElementById('emailSuggestionDropdown');
+let emailSuggestionCache=[];
+let filteredEmailSuggestions=[];
+let activeEmailSuggestionIndex=-1;
+let hideEmailSuggestionTimeout=null;
 let linkedAccountsIndex=new Map();
 let lastLinkedAccountSelected=null;
 let linkedAccountSelectionCallback=null;
@@ -581,7 +595,7 @@ function getLastLinkedAccountSelection(){
 if(typeof window!=='undefined'){
   window.setLinkedAccountSelectionCallback=setLinkedAccountSelectionCallback;
   window.getLastLinkedAccountSelection=getLastLinkedAccountSelection;
-  window.loadLinkedAccounts=loadLinkedAccounts;
+  window.refreshLinkedAccountsFromClients=refreshLinkedAccountsFromClients;
   window.getLinkedAccountsByService=getLinkedAccountsByService;
 }
 
@@ -687,7 +701,7 @@ function updateLinkedAccountsFrom(records){
   rebuildEmailSuggestions();
 }
 
-async function loadLinkedAccounts(){
+async function refreshLinkedAccountsFromClients(){
   const arr=await db.fetchAll();
   updateLinkedAccountsFrom(arr);
   return arr;
@@ -709,13 +723,106 @@ function findLinkedAccount(servicio,email){
 }
 
 function rebuildEmailSuggestions(){
-  if(!emailSuggestionsList) return;
   const servicioActual=f.servicio?.value||'';
-  const suggestions=getLinkedAccountsByService(servicioActual);
-  const options=suggestions
-    .map(item=>`<option value="${esc(item.email)}"></option>`)
-    .join('');
-  emailSuggestionsList.innerHTML=options;
+  emailSuggestionCache=getLinkedAccountsByService(servicioActual);
+  if(document.activeElement===f.email){
+    updateEmailSuggestionDropdown();
+  }else{
+    hideEmailSuggestionDropdown();
+  }
+}
+
+function hideEmailSuggestionDropdown(){
+  if(!emailSuggestionDropdown) return;
+  emailSuggestionDropdown.classList.remove('open');
+  emailSuggestionDropdown.setAttribute('aria-hidden','true');
+  emailSuggestionDropdown.innerHTML='';
+  filteredEmailSuggestions=[];
+  activeEmailSuggestionIndex=-1;
+  if(hideEmailSuggestionTimeout){
+    clearTimeout(hideEmailSuggestionTimeout);
+    hideEmailSuggestionTimeout=null;
+  }
+}
+
+function isEmailSuggestionDropdownOpen(){
+  return !!emailSuggestionDropdown && emailSuggestionDropdown.classList.contains('open');
+}
+
+function updateEmailSuggestionDropdown(filterText){
+  if(!emailSuggestionDropdown) return;
+  const term = typeof filterText==='string'
+    ? filterText.trim().toLowerCase()
+    : (f.email?.value||'').trim().toLowerCase();
+  filteredEmailSuggestions=emailSuggestionCache.filter(item=>{
+    return !term || item.email.toLowerCase().includes(term);
+  });
+
+  if(!filteredEmailSuggestions.length){
+    const emptyLabel = term ? 'Sin coincidencias' : 'Sin correos enlazados';
+    emailSuggestionDropdown.innerHTML=`<div class="suggestion-empty">${esc(emptyLabel)}</div>`;
+    emailSuggestionDropdown.classList.add('open');
+    emailSuggestionDropdown.setAttribute('aria-hidden','false');
+    activeEmailSuggestionIndex=-1;
+    return;
+  }
+
+  const html=filteredEmailSuggestions.map((item,idx)=>{
+    const hint=item.password||item.pin? '<span class="suggestion-hint">PIN guardado</span>':'';
+    return `<button type="button" class="suggestion-item" data-index="${idx}" role="option">`
+      + `<span class="suggestion-email">${esc(item.email)}</span>`
+      + hint
+      + `</button>`;
+  }).join('');
+
+  emailSuggestionDropdown.innerHTML=html;
+  emailSuggestionDropdown.classList.add('open');
+  emailSuggestionDropdown.setAttribute('aria-hidden','false');
+  activeEmailSuggestionIndex=-1;
+
+  Array.from(emailSuggestionDropdown.querySelectorAll('.suggestion-item')).forEach(btn=>{
+    btn.addEventListener('mousedown',e=>e.preventDefault());
+    btn.addEventListener('click',()=>{
+      const idx=Number(btn.dataset.index);
+      selectEmailSuggestion(idx);
+    });
+  });
+}
+
+function highlightEmailSuggestion(idx){
+  if(!emailSuggestionDropdown) return;
+  const items=Array.from(emailSuggestionDropdown.querySelectorAll('.suggestion-item'));
+  items.forEach(item=>item.classList.remove('is-active'));
+  if(idx>=0 && items[idx]){
+    items[idx].classList.add('is-active');
+    items[idx].scrollIntoView({ block:'nearest' });
+  }
+}
+
+function moveEmailSuggestion(delta){
+  if(!filteredEmailSuggestions.length){
+    updateEmailSuggestionDropdown();
+    if(!filteredEmailSuggestions.length) return;
+  }
+  if(!isEmailSuggestionDropdownOpen()){
+    emailSuggestionDropdown.classList.add('open');
+    emailSuggestionDropdown.setAttribute('aria-hidden','false');
+  }
+  activeEmailSuggestionIndex=(activeEmailSuggestionIndex+delta+filteredEmailSuggestions.length)%filteredEmailSuggestions.length;
+  highlightEmailSuggestion(activeEmailSuggestionIndex);
+}
+
+function selectEmailSuggestion(idx){
+  const account=filteredEmailSuggestions[idx];
+  if(!account) return;
+  if(f.email) f.email.value=account.email;
+  applyLinkedAccount(account);
+  handleEmailSuggestionSelection();
+  hideEmailSuggestionDropdown();
+}
+
+function showEmailSuggestions(){
+  updateEmailSuggestionDropdown();
 }
 
 function applyLinkedAccount(account){
@@ -813,7 +920,7 @@ function saveLocalClients(){
 }
 
 const LINKED_ACCOUNTS_KEY = 'linked_accounts_v1';
-function loadLinkedAccounts(){
+function loadStoredLinkedAccounts(){
   try {
     const raw = localStorage.getItem(LINKED_ACCOUNTS_KEY);
     if(!raw) return [];
@@ -850,9 +957,10 @@ function saveLinkedAccounts(arr){
   } catch (err) {
     console.warn('No se pudieron guardar correos enlazados', err);
   }
-  return loadLinkedAccounts();
+  return loadStoredLinkedAccounts();
 }
-let linkedAccounts = loadLinkedAccounts();
+let linkedAccounts = loadStoredLinkedAccounts();
+updateLinkedAccountsFrom(linkedAccounts);
 
 /* ====== AUTH (Supabase) — modal unificado ====== */
 let currentUser = null;
@@ -1064,6 +1172,8 @@ btnLinkedSave?.addEventListener('click', ()=>{
   const idx = linkedAccounts.findIndex(item => item.servicio === servicio);
   if(idx>=0) linkedAccounts[idx] = payload; else linkedAccounts.push(payload);
   linkedAccounts = saveLinkedAccounts(linkedAccounts);
+  updateLinkedAccountsFrom(linkedAccounts);
+  handleEmailSuggestionSelection();
   toast('Correo enlazado guardado ✓');
   closeLinkedModal();
 });
@@ -1337,7 +1447,7 @@ async function renderServicios(sel){
   handleEmailSuggestionSelection();
 }
 async function renderTabla(){
-  const arr = await loadLinkedAccounts();
+  const arr = await db.fetchAll();
   const items=arr.filter(x=>coincide(x,q?.value)&&pasaEstado(x,filterEstado?.value));
   tbody.innerHTML=items.map(x=>{
     const d=diasRestantes(x.vence); const est=estadoDe(x.vence);
@@ -1379,17 +1489,77 @@ if(f.servicio){
     f.servicio.addEventListener(evt,()=>{
       rebuildEmailSuggestions();
       handleEmailSuggestionSelection();
+      if(document.activeElement===f.email){
+        showEmailSuggestions();
+      }else{
+        hideEmailSuggestionDropdown();
+      }
     });
   });
 }
 if(f.email){
-  ['focus','click'].forEach(evt=>{
-    f.email.addEventListener(evt,rebuildEmailSuggestions);
+  f.email.addEventListener('focus',()=>{
+    rebuildEmailSuggestions();
+    updateEmailSuggestionDropdown(f.email.value);
+    showEmailSuggestions();
   });
-  ['change','input'].forEach(evt=>{
-    f.email.addEventListener(evt,handleEmailSuggestionSelection);
+  f.email.addEventListener('click',()=>{
+    rebuildEmailSuggestions();
+    showEmailSuggestions();
+  });
+  f.email.addEventListener('input',()=>{
+    updateEmailSuggestionDropdown(f.email.value);
+    handleEmailSuggestionSelection();
+  });
+  f.email.addEventListener('change',()=>{
+    handleEmailSuggestionSelection();
+  });
+  f.email.addEventListener('keydown',(e)=>{
+    if(e.key==='ArrowDown'){
+      e.preventDefault();
+      if(!isEmailSuggestionDropdownOpen()){
+        updateEmailSuggestionDropdown();
+        if(!filteredEmailSuggestions.length) return;
+      }
+      moveEmailSuggestion(1);
+    }else if(e.key==='ArrowUp'){
+      if(!isEmailSuggestionDropdownOpen()) return;
+      e.preventDefault();
+      moveEmailSuggestion(-1);
+    }else if(e.key==='Enter'){
+      if(isEmailSuggestionDropdownOpen() && activeEmailSuggestionIndex>=0){
+        e.preventDefault();
+        selectEmailSuggestion(activeEmailSuggestionIndex);
+      }
+    }else if(e.key==='Escape'){
+      if(isEmailSuggestionDropdownOpen()){
+        e.preventDefault();
+        hideEmailSuggestionDropdown();
+      }
+    }
+  });
+  f.email.addEventListener('blur',()=>{
+    hideEmailSuggestionTimeout=setTimeout(()=>hideEmailSuggestionDropdown(),120);
   });
 }
+if(emailSuggestionDropdown){
+  emailSuggestionDropdown.addEventListener('mouseenter',()=>{
+    if(hideEmailSuggestionTimeout){
+      clearTimeout(hideEmailSuggestionTimeout);
+      hideEmailSuggestionTimeout=null;
+    }
+  });
+  emailSuggestionDropdown.addEventListener('mouseleave',()=>{
+    hideEmailSuggestionTimeout=setTimeout(()=>hideEmailSuggestionDropdown(),120);
+  });
+}
+document.addEventListener('pointerdown',(event)=>{
+  if(!f.email || !emailSuggestionDropdown) return;
+  const target=event.target;
+  if(target===f.email) return;
+  if(emailSuggestionDropdown.contains(target)) return;
+  hideEmailSuggestionDropdown();
+});
 
 // *** Agregar/editar cliente ***
 $('#btnGuardar').onclick = async ()=>{

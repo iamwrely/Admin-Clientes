@@ -523,8 +523,9 @@ const db = {
   async saveOne(rec){
     if(!currentUser){
       localClients = loadLocalClients();
-      const idx = localClients.findIndex(x=>x.id===rec.id);
-      const payload = { ...(idx>=0? localClients[idx]:{}), ...rec };
+      const recId = rec.id ?? crypto.randomUUID();
+      const idx = localClients.findIndex(x=>x.id===recId);
+      const payload = { ...(idx>=0? localClients[idx]:{}), ...rec, id: recId };
       if(idx>=0) localClients[idx] = payload;
       else localClients.push(payload);
       localClients.sort((a,b)=> (a.nombre||'').localeCompare(b.nombre||''));
@@ -548,25 +549,26 @@ const db = {
     };
 
     let data, error;
+    const hasId = rec.id!==undefined && rec.id!==null && `${rec.id}`.trim()!=='';
 
-    if (Number.isFinite(rec.id)) {
+    if (!hasId) {
+      ({ data, error } = await sb
+        .from('clients')
+        .insert(rowNoId)
+        .select()
+        .single());
+    } else {
       ({ data, error } = await sb
         .from('clients')
         .update(rowNoId)
         .eq('id', rec.id)
         .select()
         .single());
-    } else {
-      ({ data, error } = await sb
-        .from('clients')
-        .upsert({ ...rowNoId, id: rec.id }, { onConflict: 'id' })
-        .select()
-        .single());
 
       if (error) {
         ({ data, error } = await sb
           .from('clients')
-          .insert(rowNoId)
+          .upsert({ ...rowNoId, id: rec.id }, { onConflict: 'id' })
           .select()
           .single());
       }
@@ -703,13 +705,14 @@ $('#btnLimpiar').onclick=limpiar;
 
 // *** Agregar/editar cliente ***
 $('#btnGuardar').onclick = async ()=>{
-  const isCloud = !!currentUser;
-  const data={ 
-    id: isCloud ? null : (editId ?? crypto.randomUUID()),
+  const data={
     nombre:f.nombre.value.trim(), email:f.email.value.trim(), telefono:f.telefono.value.trim(),
     servicio:f.servicio.value, inicio:f.inicio.value, vence:f.vence.value,
     categoria:f.categoria.value, notas:f.notas.value.trim(), pin:f.pin.value.trim(), ts:Date.now()
   };
+  if(editId!==null && editId!==undefined){
+    data.id = editId;
+  }
   if(!data.nombre){ toast('Escribe un nombre'); return; }
   const wasGuest = !currentUser;
   try{

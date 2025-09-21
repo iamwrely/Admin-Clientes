@@ -228,11 +228,20 @@
     .sidebar{position:fixed;inset:0 auto 0 0;width:280px;max-width:80vw;background:var(--card-bg);box-shadow:20px 0 40px rgba(0,0,0,.35);transform:translateX(-110%);transition:transform .3s ease;z-index:40;padding:60px 20px 20px;display:flex;flex-direction:column}
     .sidebar.open,.sidebar[aria-hidden="false"]{transform:translateX(0)}
     .sidebar-content{position:relative;height:100%;overflow-y:auto}
-    .sidebar-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:16px}
-    .sidebar-list li{display:flex;flex-direction:column;gap:8px;color:var(--ink)}
-    .sidebar-list li button.btn{align-self:flex-start}
-    .auth-controls{gap:12px}
-    .sidebar input,.sidebar select{border:1px solid var(--input-border);background:var(--input-bg);color:var(--ink)}
+      .sidebar-nav{display:grid;gap:14px}
+      .nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;border:1px solid var(--ghost-border);background:var(--ghost);color:var(--ink);cursor:pointer;transition:background .2s ease,border-color .2s ease,transform .2s ease;position:relative;text-align:left}
+      .nav-item .icon{display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;color:currentColor}
+      .nav-item .icon svg{width:100%;height:100%}
+      .nav-item .label{font-weight:600;letter-spacing:.01em}
+      .nav-item .tooltip{position:absolute;top:50%;left:calc(100% + 10px);transform:translateY(-50%);background:var(--ghost);border:1px solid var(--ghost-border);border-radius:10px;padding:6px 10px;font-size:12px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .2s ease,transform .2s ease;box-shadow:0 10px 20px rgba(5,9,15,.35)}
+      .nav-item:focus-visible,.nav-item:hover{background:var(--ghost-hover-bg);border-color:var(--ghost-hover-border);transform:translateX(2px)}
+      .nav-item:focus-visible{outline:2px solid rgba(125,211,252,.45);outline-offset:3px}
+      .sidebar[data-collapsed="true"] .nav-item{justify-content:center}
+      .sidebar[data-collapsed="true"] .nav-item .label{position:absolute;clip:rect(0 0 0 0);width:1px;height:1px;margin:-1px;border:0;padding:0;overflow:hidden}
+      .sidebar[data-collapsed="true"] .nav-item .tooltip{display:block;pointer-events:auto;opacity:0}
+      .sidebar[data-collapsed="true"] .nav-item:focus-visible .tooltip,
+      .sidebar[data-collapsed="true"] .nav-item:hover .tooltip{opacity:1;transform:translate(6px,-50%)}
+      .sidebar input,.sidebar select{border:1px solid var(--input-border);background:var(--input-bg);color:var(--ink)}
     .sidebar-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:30}
     .sidebar-backdrop.visible{opacity:1;pointer-events:auto}
     .btn.ghost:hover,.btn.ghost:focus-visible{background:var(--ghost-hover-bg);border-color:var(--ghost-hover-border)}
@@ -253,13 +262,35 @@
     .tag{border:1px solid var(--tag-border);background:var(--tag-bg)}
     .menu{background:var(--menu-bg)}
     .menu-item:hover{background:var(--menu-hover-bg)}
-    .menu-item[aria-checked="true"]{background:var(--ghost);border:1px solid var(--ghost-border);font-weight:600}
-    .modal-backdrop{background:var(--backdrop-bg)}
-    .modal{background:var(--modal-bg)}
-    .theme-switcher{position:relative}
-    .theme-btn{display:flex;align-items:center;gap:8px;white-space:nowrap}
-    .theme-btn-label{display:flex;align-items:center;gap:6px}
-    .theme-btn-icon{font-size:12px;opacity:.8}
+      .menu-item[aria-checked="true"]{background:var(--ghost);border:1px solid var(--ghost-border);font-weight:600}
+      #overlay{position:fixed;inset:0;background:var(--backdrop-bg);opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:120}
+      #overlay.visible{opacity:1;pointer-events:auto}
+      #modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;pointer-events:none;opacity:0;transition:opacity .2s ease;z-index:130}
+      #modal.open{opacity:1;pointer-events:auto}
+      #modal .modal-dialog{background:var(--modal-bg);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow);width:min(640px,94vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+      #modal header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.1)}
+      #modal header h2{margin:0;font-size:18px;font-weight:700;color:var(--ink)}
+      #modal .modal-body{padding:18px 20px;overflow-y:auto;color:var(--ink)}
+      .modal-close{background:var(--ghost);border:1px solid var(--ghost-border);border-radius:10px;padding:6px 10px;color:var(--ink);cursor:pointer;font-weight:600;transition:background .2s ease,border-color .2s ease}
+      .modal-close:hover,.modal-close:focus-visible{background:var(--ghost-hover-bg);border-color:var(--ghost-hover-border)}
+      .field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+      .field label{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+      .modal-body .field:last-child{margin-bottom:0}
+      .status-cards{display:grid;gap:12px;margin:16px 0}
+      @media(min-width:520px){ .status-cards{grid-template-columns:repeat(2,minmax(0,1fr));} }
+      .status-card{padding:12px 14px;border-radius:14px;border:1px solid var(--border);background:var(--card-bg);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+      .status-card strong{display:block;font-size:20px;font-weight:700;color:var(--ink)}
+      .status-card span{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+      .theme-options{display:grid;gap:12px;margin-top:12px}
+      .theme-option{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:var(--card-bg);cursor:pointer;transition:border-color .2s ease,background .2s ease}
+      .theme-option:hover,.theme-option:focus-within{border-color:var(--ghost-hover-border);background:var(--ghost-hover-bg)}
+      .theme-option input{margin-top:4px}
+      .theme-option strong{font-size:15px;font-weight:700;color:var(--ink)}
+      .theme-option span{font-size:13px;color:var(--muted)}
+      .account-form{display:flex;flex-direction:column;gap:16px}
+      .account-form .actions{margin-top:0}
+      .chat-controls{display:grid;grid-template-columns:1fr auto;gap:8px;margin:14px 0}
+      .chat-controls textarea{min-height:90px;resize:vertical}
 
     @media (max-width:680px){ .sidebar{width:240px} }
   </style>
@@ -274,41 +305,58 @@
     <div class="sidebar-content">
       <button class="menu-toggle close" id="btnMenuClose" aria-label="Cerrar menú">×</button>
       <nav aria-label="Controles principales">
-        <ul class="sidebar-list">
-          <li>
-            <label for="q">Buscar</label>
-            <input id="q" placeholder="Buscar por nombre, email o servicio…"/>
-          </li>
-          <li>
-            <label for="filterEstado">Estado</label>
-            <select id="filterEstado">
-              <option value="">Todos</option>
-              <option value="vigente">Vigentes</option>
-              <option value="pronto">Por vencer (≤7 días)</option>
-              <option value="vencida">Vencidas</option>
-            </select>
-          </li>
-          <li>
-            <div class="menu-wrap theme-switcher">
-              <button type="button" class="btn ghost theme-btn" id="btnTheme" data-menu-toggle aria-haspopup="menu" aria-expanded="false">
-                <span class="theme-btn-label">Tema: <span id="themeLabel">Oscuro</span></span>
-                <span class="theme-btn-icon" aria-hidden="true">▾</span>
-              </button>
-              <div class="menu" id="themeMenu" role="menu">
-                <button class="menu-item" type="button" role="menuitemradio" data-theme-option="dark" aria-checked="true">Oscuro</button>
-                <button class="menu-item" type="button" role="menuitemradio" data-theme-option="light" aria-checked="false">Claro</button>
-              </div>
-            </div>
-          </li>
-          <li class="auth-controls">
-            <button class="btn ghost" id="btnAuthOpen">Acceder</button>
-            <button class="btn ghost" id="btnLogout" style="display:none">Cerrar sesión</button>
-            <span id="userInfo" class="pill" style="display:none"></span>
-          </li>
-          <li>
-            <button class="btn ghost" id="btnChatOpen" title="Abrir chat con Gemini">Chat Gemini</button>
-          </li>
-        </ul>
+        <div class="sidebar-nav" id="primaryNav" data-nav>
+          <button type="button" class="nav-item" data-action="search" aria-label="Buscar" aria-describedby="tip-search">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="6"></circle>
+                <line x1="20" y1="20" x2="16.65" y2="16.65"></line>
+              </svg>
+            </span>
+            <span class="label">Buscar</span>
+            <span class="tooltip" role="tooltip" id="tip-search">Buscar</span>
+          </button>
+          <button type="button" class="nav-item" data-action="status" aria-label="Panel de estado" aria-describedby="tip-status">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 19h16"></path>
+                <path d="M7 16v-6"></path>
+                <path d="M12 16V8"></path>
+                <path d="M17 16v-4"></path>
+              </svg>
+            </span>
+            <span class="label">Estado</span>
+            <span class="tooltip" role="tooltip" id="tip-status">Panel de estado</span>
+          </button>
+          <button type="button" class="nav-item" data-action="theme" aria-label="Cambiar tema" aria-describedby="tip-theme">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            </span>
+            <span class="label"><span id="navThemeLabel">Tema</span></span>
+            <span class="tooltip" role="tooltip" id="tip-theme">Cambiar tema</span>
+          </button>
+          <button type="button" class="nav-item" data-action="account" aria-label="Cuenta" aria-describedby="tip-account">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </span>
+            <span class="label"><span id="navAccountLabel">Cuenta</span></span>
+            <span class="tooltip" role="tooltip" id="tip-account">Cuenta</span>
+          </button>
+          <button type="button" class="nav-item" data-action="chat" aria-label="Asistente IA" aria-describedby="tip-chat">
+            <span class="icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+              </svg>
+            </span>
+            <span class="label">Chat IA</span>
+            <span class="tooltip" role="tooltip" id="tip-chat">Asistente IA</span>
+          </button>
+        </div>
       </nav>
     </div>
   </aside>
@@ -401,57 +449,14 @@
     </section>
   </div>
 
-  <!-- ===== Modal Chat Gemini ===== -->
-  <div id="chatModal" class="modal-backdrop" aria-hidden="true">
-    <div class="modal" role="dialog" aria-label="Chat Gemini">
+  <div id="overlay" hidden></div>
+  <div id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
+    <div class="modal-dialog">
       <header>
-        <strong>Chat Gemini</strong>
-        <button class="btn ghost" id="btnChatClose">Cerrar</button>
+        <h2 id="modalTitle"></h2>
+        <button type="button" class="modal-close" data-modal-close aria-label="Cerrar">Cerrar</button>
       </header>
-      <div class="body">
-        <div id="chatLog" class="chat-log"></div>
-        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px">
-          <input id="chatInput" placeholder="Escribe un mensaje…"/>
-          <button class="btn primary" id="btnSend">Enviar</button>
-        </div>
-        <div class="small" style="text-align:left;margin-top:6px">
-          <label><input type="checkbox" id="shareSecrets"> Compartir datos sensibles (PIN y notas)</label>
-        </div>
-        <div class="small">Conexión directa a Gemini desde el navegador (API key expuesta).</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== Modal Acceso (login/registro en 1) ===== -->
-  <div id="authModal" class="modal-backdrop" aria-hidden="true">
-    <div class="modal" role="dialog" aria-label="Acceder">
-      <header>
-        <strong>Acceder</strong>
-        <button class="btn ghost" id="btnAuthClose">Cancelar</button>
-      </header>
-      <div class="body">
-        <div class="row">
-          <label for="authEmail">Correo</label>
-          <input id="authEmail" type="email" placeholder="tucorreo@ejemplo.com" autocomplete="email">
-        </div>
-        <div class="row">
-          <label for="authPass">Contraseña</label>
-          <div class="pin-wrap">
-            <input id="authPass" type="password" placeholder="••••••••" autocomplete="current-password">
-            <button type="button" class="eye" id="toggleAuthPass" aria-label="Mostrar/ocultar contraseña">👁</button>
-          </div>
-        </div>
-
-        <div class="small" style="text-align:left;margin-top:0">
-          <button id="btnForgot" class="linklike" type="button">¿Olvidaste tu contraseña?</button>
-        </div>
-
-        <div class="actions" style="justify-content:flex-end">
-          <button class="btn primary" id="btnAuthSubmit">Continuar</button>
-        </div>
-        <div class="small" id="authHelp">Si es tu primera vez, crearemos tu cuenta automáticamente.</div>
-        <div class="small" id="authError" style="color:var(--danger)"></div>
-      </div>
+      <div class="modal-body" id="modalBody"></div>
     </div>
   </div>
 
@@ -470,17 +475,30 @@ const tbody=$('#tabla tbody');
 const f={nombre:$('#nombre'),email:$('#email'),telefono:$('#telefono'),
 servicio:$('#servicio'),inicio:$('#inicio'),vence:$('#vence'),notas:$('#notas'),
 categoria:$('#categoria'), pin:$('#pin')};
-const q=$('#q'), filterEstado=$('#filterEstado'), msg=$('#msg');
+const msg=$('#msg');
 const sidebar=document.getElementById('sidebar');
 const sidebarToggle=document.getElementById('btnMenuToggle');
 const sidebarClose=document.getElementById('btnMenuClose');
 const sidebarBackdrop=document.getElementById('sidebarBackdrop');
-const themeButton=document.getElementById('btnTheme');
-const themeLabel=document.getElementById('themeLabel');
-const themeMenu=document.getElementById('themeMenu');
-const themeOptions=Array.from(themeMenu?.querySelectorAll('[data-theme-option]')||[]);
+const nav=document.getElementById('primaryNav');
+const navThemeLabel=document.getElementById('navThemeLabel');
+const navAccountLabel=document.getElementById('navAccountLabel');
+const themeNavButton=nav?.querySelector('[data-action="theme"]');
+const accountNavButton=nav?.querySelector('[data-action="account"]');
+const overlay=document.getElementById('overlay');
+const modal=document.getElementById('modal');
+const modalTitle=document.getElementById('modalTitle');
+const modalBody=document.getElementById('modalBody');
+const modalCloseButton=modal?.querySelector('[data-modal-close]');
 const THEME_STORAGE_KEY='ui_theme_mode_v1';
 let editId=null;
+let activeTrigger=null;
+let modalCleanup=null;
+let currentModalAction=null;
+let searchTerm='';
+let estadoFiltro='';
+let accountModalUpdater=null;
+let chatUIRefs=null;
 
 function openSidebar(){
   if(!sidebar) return;
@@ -509,6 +527,449 @@ function toast(t){ msg.textContent=t; setTimeout(()=>msg.textContent='',2200); }
 function esc(s){return (s||'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;' }[m]))}
 function fmt(iso){return iso? new Date(iso+'T00:00:00').toLocaleDateString(): '-'}
 
+function getFocusable(container){
+  return Array.from(container.querySelectorAll('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'))
+    .filter(el=>!el.hasAttribute('disabled') && el.getAttribute('aria-hidden')!=='true');
+}
+
+function focusFirst(container){
+  const nodes=getFocusable(container);
+  if(nodes.length){ nodes[0].focus(); }
+  else modalCloseButton?.focus();
+}
+
+function closeModal({restoreFocus=true}={}){
+  if(!modal?.classList.contains('open')) return;
+  modal.classList.remove('open');
+  modal.setAttribute('hidden','');
+  overlay?.classList.remove('visible');
+  overlay?.setAttribute('hidden','');
+  if(typeof modalCleanup==='function'){ try{ modalCleanup(); }catch(err){ console.warn('Error al cerrar modal', err); } }
+  modalCleanup=null;
+  accountModalUpdater=null;
+  chatUIRefs=null;
+  currentModalAction=null;
+  const trigger=activeTrigger;
+  activeTrigger=null;
+  modalBody.innerHTML='';
+  if(restoreFocus && trigger){ try{ trigger.focus(); }catch{} }
+}
+
+function openModalFor(action, trigger){
+  if(!modal || !overlay) return;
+  const builder = modalBuilders[action];
+  if(typeof builder!=='function') return;
+  closeModal({restoreFocus:false});
+  const result = builder();
+  if(!result) return;
+  const { title, content, onOpen, onClose } = result;
+  modalTitle.textContent = title || '';
+  modalBody.innerHTML='';
+  if(typeof content==='string') modalBody.innerHTML = content;
+  else if(content instanceof Node) modalBody.append(content);
+  else if(Array.isArray(content)) content.forEach(node=>{ if(node instanceof Node) modalBody.append(node); });
+  modalCleanup = typeof onClose==='function'? onClose : null;
+  activeTrigger = trigger || null;
+  currentModalAction = action;
+  overlay.classList.add('visible');
+  overlay.removeAttribute('hidden');
+  modal.classList.add('open');
+  modal.removeAttribute('hidden');
+  requestAnimationFrame(()=>{
+    focusFirst(modalBody);
+    if(typeof onOpen==='function') onOpen();
+  });
+}
+
+function buildSearchModal(){
+  const wrapper=document.createElement('div');
+  const field=document.createElement('div');
+  field.className='field';
+  const label=document.createElement('label');
+  label.setAttribute('for','modalSearchInput');
+  label.textContent='Buscar en clientes';
+  const input=document.createElement('input');
+  input.id='modalSearchInput';
+  input.type='search';
+  input.placeholder='Nombre, email o servicio';
+  input.autocomplete='off';
+  input.value=searchTerm;
+  const hint=document.createElement('p');
+  hint.className='small';
+  const actions=document.createElement('div');
+  actions.className='actions';
+  actions.style.justifyContent='flex-end';
+  const clearBtn=document.createElement('button');
+  clearBtn.type='button';
+  clearBtn.className='btn ghost';
+  clearBtn.textContent='Limpiar búsqueda';
+  actions.append(clearBtn);
+  field.append(label,input);
+  wrapper.append(field,hint,actions);
+
+  const estadoLabels={vigente:'vigentes',pronto:'por vencer',vencida:'vencidas'};
+  function updateHint(){
+    const arr=db.getAll();
+    const filtered=arr.filter(x=>coincide(x,searchTerm)&&pasaEstado(x,estadoFiltro));
+    const estadoTxt=estadoFiltro?` con estado ${estadoLabels[estadoFiltro]||estadoFiltro}`:'';
+    if(searchTerm){
+      hint.textContent=`${filtered.length} resultado${filtered.length===1?'':'s'} coinciden con "${searchTerm}"${estadoTxt}.`;
+    }else{
+      hint.textContent=`${filtered.length} de ${arr.length} registros visibles${estadoTxt}.`;
+    }
+    clearBtn.disabled=!searchTerm;
+  }
+
+  input.addEventListener('input',e=>{
+    searchTerm=e.target.value;
+    renderTabla().then(updateHint).catch(()=>updateHint());
+  });
+
+  clearBtn.addEventListener('click',()=>{
+    if(!searchTerm) return;
+    searchTerm='';
+    input.value='';
+    renderTabla().then(updateHint).catch(()=>updateHint());
+    input.focus();
+  });
+
+  updateHint();
+
+  return {
+    title:'Buscar',
+    content:wrapper,
+    onOpen(){ setTimeout(()=>{ input.focus(); input.select(); },50); }
+  };
+}
+
+function buildStatusModal(){
+  const wrapper=document.createElement('div');
+  const description=document.createElement('p');
+  description.className='small';
+  description.textContent='Consulta el resumen de clientes y aplica un filtro rápido por estado.';
+  const field=document.createElement('div');
+  field.className='field';
+  const label=document.createElement('label');
+  label.setAttribute('for','modalEstadoSelect');
+  label.textContent='Filtrar por estado';
+  const select=document.createElement('select');
+  select.id='modalEstadoSelect';
+  [['','Todos'],['vigente','Vigentes'],['pronto','Por vencer (≤7 días)'],['vencida','Vencidas']]
+    .forEach(([value,text])=>{
+      const option=document.createElement('option');
+      option.value=value;
+      option.textContent=text;
+      select.append(option);
+    });
+  select.value=estadoFiltro||'';
+  field.append(label,select);
+  const cards=document.createElement('div');
+  cards.className='status-cards';
+  const summary=document.createElement('p');
+  summary.className='small';
+
+  const estadoLabels={vigente:'vigentes',pronto:'por vencer',vencida:'vencidas'};
+  function makeCard(labelText,value){
+    const card=document.createElement('div');
+    card.className='status-card';
+    const strong=document.createElement('strong');
+    strong.textContent=String(value);
+    const span=document.createElement('span');
+    span.textContent=labelText;
+    card.append(strong,span);
+    return card;
+  }
+
+  function updateSummary(){
+    const arr=db.getAll();
+    const counts={total:arr.length,vigente:0,pronto:0,vencida:0};
+    arr.forEach(item=>{ const est=estadoDe(item.vence); if(est&&counts[est]!==undefined) counts[est]++; });
+    cards.innerHTML='';
+    cards.append(
+      makeCard('Total',counts.total),
+      makeCard('Vigentes',counts.vigente),
+      makeCard('Por vencer',counts.pronto),
+      makeCard('Vencidas',counts.vencida)
+    );
+    const visibles=arr.filter(x=>coincide(x,searchTerm)&&pasaEstado(x,estadoFiltro)).length;
+    summary.textContent = estadoFiltro
+      ? `Filtro aplicado: ${estadoLabels[estadoFiltro]||estadoFiltro}. Resultados visibles: ${visibles}.`
+      : `Resultados visibles: ${visibles} (sin filtro por estado).`;
+  }
+
+  select.addEventListener('change',e=>{
+    estadoFiltro=e.target.value;
+    renderTabla().then(updateSummary).catch(()=>updateSummary());
+  });
+
+  updateSummary();
+
+  wrapper.append(description,field,cards,summary);
+  return {
+    title:'Panel de estado',
+    content:wrapper,
+    onOpen(){ select.focus(); }
+  };
+}
+
+function buildThemeModal(){
+  const wrapper=document.createElement('div');
+  const description=document.createElement('p');
+  description.className='small';
+  description.textContent='Elige el modo que prefieras. Guardamos tu selección en este dispositivo.';
+  const options=document.createElement('div');
+  options.className='theme-options';
+  const current=document.body.classList.contains('theme-light')?'light':'dark';
+  const choices=[
+    {value:'dark',label:'Oscuro',detail:'Mejor contraste en ambientes tenues.'},
+    {value:'light',label:'Claro',detail:'Ideal para espacios iluminados.'}
+  ];
+  choices.forEach(opt=>{
+    const item=document.createElement('label');
+    item.className='theme-option';
+    const radio=document.createElement('input');
+    radio.type='radio';
+    radio.name='themeOption';
+    radio.value=opt.value;
+    radio.checked=opt.value===current;
+    const title=document.createElement('strong');
+    title.textContent=opt.label;
+    const detail=document.createElement('span');
+    detail.textContent=opt.detail;
+    item.append(radio,title,detail);
+    options.append(item);
+  });
+  options.addEventListener('change',e=>{
+    if(e.target && e.target.name==='themeOption'){
+      applyTheme(e.target.value);
+    }
+  });
+  wrapper.append(description,options);
+  return {
+    title:'Cambiar tema',
+    content:wrapper,
+    onOpen(){ const checked=options.querySelector('input:checked'); if(checked) checked.focus(); }
+  };
+}
+
+function buildAccountModal(){
+  const container=document.createElement('div');
+
+  function render(){
+    container.innerHTML='';
+    if(currentUser){
+      const p=document.createElement('p');
+      p.innerHTML=`Sesión iniciada como <strong>${esc(currentUser.email||'')}</strong>.`;
+      const actions=document.createElement('div');
+      actions.className='actions';
+      actions.style.flexDirection='column';
+      actions.style.alignItems='flex-start';
+      const placeholder=document.createElement('button');
+      placeholder.type='button';
+      placeholder.className='btn ghost';
+      placeholder.textContent='Administrar cuenta (próximamente)';
+      placeholder.disabled=true;
+      placeholder.setAttribute('aria-disabled','true');
+      const logout=document.createElement('button');
+      logout.type='button';
+      logout.className='btn primary';
+      logout.textContent='Cerrar sesión';
+      logout.addEventListener('click',async ()=>{
+        await sb.auth.signOut();
+        closeModal();
+      });
+      actions.append(placeholder,logout);
+      container.append(p,actions);
+    }else{
+      const form=document.createElement('form');
+      form.className='account-form';
+      const emailField=document.createElement('div');
+      emailField.className='field';
+      const emailLabel=document.createElement('label');
+      emailLabel.setAttribute('for','authEmail');
+      emailLabel.textContent='Correo electrónico';
+      const emailInput=document.createElement('input');
+      emailInput.id='authEmail';
+      emailInput.type='email';
+      emailInput.placeholder='tucorreo@ejemplo.com';
+      emailInput.autocomplete='email';
+      emailField.append(emailLabel,emailInput);
+
+      const passField=document.createElement('div');
+      passField.className='field';
+      const passLabel=document.createElement('label');
+      passLabel.setAttribute('for','authPass');
+      passLabel.textContent='Contraseña';
+      const passWrap=document.createElement('div');
+      passWrap.className='pin-wrap';
+      const passInput=document.createElement('input');
+      passInput.id='authPass';
+      passInput.type='password';
+      passInput.placeholder='••••••••';
+      passInput.autocomplete='current-password';
+      const toggle=document.createElement('button');
+      toggle.type='button';
+      toggle.className='eye';
+      toggle.setAttribute('aria-label','Mostrar u ocultar contraseña');
+      toggle.textContent='👁';
+      toggle.addEventListener('click',()=>{
+        const isPass=passInput.type==='password';
+        passInput.type=isPass?'text':'password';
+        toggle.textContent=isPass?'🙈':'👁';
+      });
+      passWrap.append(passInput,toggle);
+      passField.append(passLabel,passWrap);
+
+      const helper=document.createElement('div');
+      helper.className='small';
+      helper.textContent='Si es tu primera vez, crearemos tu cuenta automáticamente.';
+      const error=document.createElement('div');
+      error.className='small';
+      error.style.color='var(--danger)';
+      const actions=document.createElement('div');
+      actions.className='actions';
+      actions.style.justifyContent='flex-end';
+      const submit=document.createElement('button');
+      submit.type='submit';
+      submit.className='btn primary';
+      submit.textContent='Continuar';
+      actions.append(submit);
+      const forgot=document.createElement('button');
+      forgot.type='button';
+      forgot.className='linklike';
+      forgot.textContent='¿Olvidaste tu contraseña?';
+      const forgotWrap=document.createElement('div');
+      forgotWrap.className='small';
+      forgotWrap.style.textAlign='left';
+      forgotWrap.append(forgot);
+
+      form.append(emailField,passField,actions,helper,error,forgotWrap);
+
+      form.addEventListener('submit',async e=>{
+        e.preventDefault();
+        error.textContent='';
+        const email=(emailInput.value||'').trim();
+        const pass=(passInput.value||'').trim();
+        if(!email || !pass){
+          error.textContent='Completa correo y contraseña.';
+          return;
+        }
+        submit.disabled=true;
+        submit.textContent='Procesando…';
+        try{
+          const r=await autoSignInOrUp(email,pass);
+          if(!r.ok){
+            error.textContent=r.message||'No se pudo acceder.';
+          }else{
+            closeModal();
+            toast('¡Bienvenido!');
+          }
+        }catch(err){
+          error.textContent=err?.message||'Error inesperado.';
+        }finally{
+          submit.disabled=false;
+          submit.textContent='Continuar';
+        }
+      });
+
+      forgot.addEventListener('click',async ()=>{
+        error.style.color='var(--danger)';
+        error.textContent='';
+        const email=(emailInput.value||'').trim();
+        if(!email){
+          error.textContent='Escribe tu correo arriba para enviarte el enlace.';
+          return;
+        }
+        const { error:err } = await sb.auth.resetPasswordForEmail(email,{ redirectTo: location.origin + location.pathname });
+        if(err){
+          error.textContent=err.message||'No se pudo enviar el correo de recuperación.';
+          return;
+        }
+        error.style.color='var(--success)';
+        error.textContent='Te enviamos un correo para restablecer tu contraseña.';
+      });
+
+      container.append(form);
+      requestAnimationFrame(()=>emailInput.focus());
+    }
+  }
+
+  render();
+  accountModalUpdater=render;
+
+  return {
+    title:'Cuenta',
+    content:container,
+    onOpen(){ const focusable=getFocusable(container); if(focusable.length) focusable[0].focus(); },
+    onClose(){ accountModalUpdater=null; }
+  };
+}
+
+function buildChatModal(){
+  const container=document.createElement('div');
+  const log=document.createElement('div');
+  log.className='chat-log';
+  const inputWrap=document.createElement('div');
+  inputWrap.className='chat-controls';
+  const textarea=document.createElement('textarea');
+  textarea.placeholder='Escribe un mensaje…';
+  textarea.rows=3;
+  const send=document.createElement('button');
+  send.type='button';
+  send.className='btn primary';
+  send.textContent='Enviar';
+  inputWrap.append(textarea,send);
+  const shareLabel=document.createElement('label');
+  shareLabel.className='small';
+  shareLabel.style.display='flex';
+  shareLabel.style.alignItems='center';
+  shareLabel.style.gap='8px';
+  const share=document.createElement('input');
+  share.type='checkbox';
+  share.checked=false;
+  shareLabel.append(share,document.createTextNode('Compartir datos sensibles (PIN y notas)'));
+  const info=document.createElement('div');
+  info.className='small';
+  info.textContent='Conexión directa a Gemini desde el navegador (API key expuesta).';
+
+  container.append(log,inputWrap,shareLabel,info);
+
+  chatUIRefs={ log,input:textarea,send,share };
+  renderChat();
+
+  send.addEventListener('click',sendChat);
+  textarea.addEventListener('keydown',e=>{
+    if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }
+  });
+
+  return {
+    title:'Chat IA',
+    content:container,
+    onOpen(){ setTimeout(()=>textarea.focus(),50); },
+    onClose(){ chatUIRefs=null; }
+  };
+}
+
+const modalBuilders={
+  search:buildSearchModal,
+  status:buildStatusModal,
+  theme:buildThemeModal,
+  account:buildAccountModal,
+  chat:buildChatModal
+};
+
+overlay?.addEventListener('click',()=>closeModal());
+modalCloseButton?.addEventListener('click',()=>closeModal());
+modal?.addEventListener('click',e=>{ if(e.target===modal) closeModal(); });
+
+nav?.addEventListener('click',e=>{
+  const btn=e.target.closest('.nav-item');
+  if(!btn || !nav.contains(btn)) return;
+  e.preventDefault();
+  closeSidebar();
+  openModalFor(btn.dataset.action, btn);
+});
+
 function diasRestantes(iso){
   if(!iso) return null; const h=new Date();h.setHours(0,0,0,0);
   const d=new Date(iso); d.setHours(0,0,0,0);
@@ -521,14 +982,9 @@ function estadoDe(vence){
 function limpiar(){ editId=null; for(const k in f){ if('value' in f[k]) f[k].value=''; } renderServicios(); msg.textContent=''; }
 
 function updateThemeControls(mode){
-  if(themeLabel){ themeLabel.textContent = mode==='light' ? 'Claro' : 'Oscuro'; }
-  themeOptions.forEach(btn=>{
-    const isActive = btn.dataset.themeOption === mode;
-    btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
-  });
-  if(themeButton){
-    themeButton.setAttribute('data-selected-theme', mode);
-    themeButton.setAttribute('aria-label', `Tema actual: ${mode==='light'?'Claro':'Oscuro'}`);
+  if(navThemeLabel){ navThemeLabel.textContent = mode==='light' ? 'Tema claro' : 'Tema oscuro'; }
+  if(themeNavButton){
+    themeNavButton.setAttribute('aria-label', `Cambiar tema (actual: ${mode==='light'?'claro':'oscuro'})`);
   }
 }
 
@@ -605,47 +1061,24 @@ sb.auth.onAuthStateChange((_e, session)=>{
 });
 
 function authUpdateUI(){
-  const badge = document.getElementById('userInfo');
-  const btnAuthOpen = document.getElementById('btnAuthOpen');
-  const btnLogout = document.getElementById('btnLogout');
-  if(currentUser){
-    badge.style.display='inline-block';
-    badge.textContent = currentUser.email;
-    btnAuthOpen.style.display='none';
-    btnLogout.style.display='inline-block';
-  }else{
-    badge.style.display='none';
-    btnAuthOpen.style.display='inline-block';
-    btnLogout.style.display='none';
+  if(navAccountLabel){
+    navAccountLabel.textContent = currentUser ? 'Mi cuenta' : 'Cuenta';
+  }
+  if(accountNavButton){
+    const tooltip=accountNavButton.querySelector('.tooltip');
+    if(tooltip){
+      tooltip.textContent = currentUser ? `Cuenta (${currentUser.email})` : 'Cuenta invitado';
+    }
+    accountNavButton.setAttribute('aria-label', currentUser ? `Gestionar cuenta (${currentUser.email})` : 'Gestionar cuenta (invitado)');
+  }
+  if(typeof accountModalUpdater==='function'){
+    accountModalUpdater();
   }
 }
 
-// ----- Modal helpers -----
-const authModal    = document.getElementById('authModal');
-const btnAuthOpen  = document.getElementById('btnAuthOpen');
-const btnAuthClose = document.getElementById('btnAuthClose');
-const btnAuthSubmit= document.getElementById('btnAuthSubmit');
-const authEmailEl  = document.getElementById('authEmail');
-const authPassEl   = document.getElementById('authPass');
-const authErrorEl  = document.getElementById('authError');
-const toggleAuthPass = document.getElementById('toggleAuthPass');
-const btnForgot    = document.getElementById('btnForgot');
+authUpdateUI();
 
-function openAuth(){ authErrorEl.textContent=''; authErrorEl.style.color='var(--danger)'; authModal.classList.add('open'); authModal.setAttribute('aria-hidden','false'); setTimeout(()=>authEmailEl?.focus(), 0); }
-function closeAuth(){ authModal.classList.remove('open'); authModal.setAttribute('aria-hidden','true'); }
-
-btnAuthOpen?.addEventListener('click', openAuth);
-btnAuthClose?.addEventListener('click', closeAuth);
-authModal?.addEventListener('click', (e)=>{ if(e.target===authModal) closeAuth(); });
-document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeAuth(); });
-
-toggleAuthPass?.addEventListener('click', ()=>{
-  const isPass = authPassEl.type==='password';
-  authPassEl.type = isPass? 'text':'password';
-  toggleAuthPass.textContent = isPass? '🙈':'👁';
-});
-
-sidebarToggle?.addEventListener('click', (e)=>{ e.stopPropagation(); toggleSidebar(); });
+  sidebarToggle?.addEventListener('click', (e)=>{ e.stopPropagation(); toggleSidebar(); });
 sidebarClose?.addEventListener('click', (e)=>{ e.stopPropagation(); closeSidebar(); });
 sidebarBackdrop?.addEventListener('click', ()=> closeSidebar());
 document.addEventListener('click', (e)=>{
@@ -655,7 +1088,29 @@ document.addEventListener('click', (e)=>{
   if(e.target===sidebarToggle) return;
   closeSidebar();
 });
-document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeSidebar(); });
+document.addEventListener('keydown', (e)=>{
+  if(e.key==='Escape'){
+    closeModal();
+    closeSidebar();
+  }
+  if(e.key==='Tab' && modal?.classList.contains('open')){
+    const focusables=getFocusable(modal);
+    if(!focusables.length) return;
+    const first=focusables[0];
+    const last=focusables[focusables.length-1];
+    if(e.shiftKey){
+      if(document.activeElement===first){
+        e.preventDefault();
+        last.focus();
+      }
+    }else{
+      if(document.activeElement===last){
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+});
 
 // ----- Lógica unificada: registrar o iniciar sesión -----
 async function autoSignInOrUp(email, password) {
@@ -674,46 +1129,6 @@ async function autoSignInOrUp(email, password) {
   }
   return { ok: true };
 }
-
-btnAuthSubmit?.addEventListener('click', async () => {
-  const email = (authEmailEl.value || '').trim();
-  const pass  = (authPassEl.value || '').trim();
-  authErrorEl.textContent = '';
-  authErrorEl.style.color = 'var(--danger)';
-
-  if (!email || !pass) {
-    authErrorEl.textContent = 'Completa correo y contraseña.';
-    return;
-  }
-  btnAuthSubmit.disabled = true; btnAuthSubmit.textContent = 'Procesando…';
-  try {
-    const r = await autoSignInOrUp(email, pass);
-    if (!r.ok) {
-      authErrorEl.textContent = r.message || 'No se pudo acceder.';
-    } else {
-      closeAuth();
-      toast('¡Bienvenido!');
-    }
-  } catch (err) {
-    authErrorEl.textContent = err.message || 'Error inesperado.';
-  } finally {
-    btnAuthSubmit.disabled = false; btnAuthSubmit.textContent = 'Continuar';
-  }
-});
-
-document.getElementById('btnLogout')?.addEventListener('click', async ()=>{ await sb.auth.signOut(); });
-
-// ----- ¿Olvidaste tu contraseña? -----
-btnForgot?.addEventListener('click', async ()=>{
-  const email = (authEmailEl.value||'').trim();
-  authErrorEl.style.color = 'var(--danger)';
-  authErrorEl.textContent = '';
-  if(!email){ authErrorEl.textContent = 'Escribe tu correo arriba para enviarte el enlace.'; return; }
-  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
-  if(error){ authErrorEl.textContent = error.message || 'No se pudo enviar el correo de recuperación.'; return; }
-  authErrorEl.style.color = 'var(--success)';
-  authErrorEl.textContent = 'Te enviamos un correo para restablecer tu contraseña.';
-});
 
 /* ====== DB en la nube (Supabase) ====== */
 let cacheClientes = localClients.slice();
@@ -885,7 +1300,7 @@ async function renderServicios(sel){
 }
 async function renderTabla(){
   const arr = await db.fetchAll();
-  const items=arr.filter(x=>coincide(x,q?.value)&&pasaEstado(x,filterEstado?.value));
+  const items=arr.filter(x=>coincide(x,searchTerm)&&pasaEstado(x,estadoFiltro));
   tbody.innerHTML=items.map(x=>{
     const d=diasRestantes(x.vence); const est=estadoDe(x.vence);
     const tag=est==='vigente'?'ok':est==='pronto'?'warn':'bad';
@@ -912,10 +1327,10 @@ async function renderTabla(){
     </tr>`;
   }).join('');
 }
-function coincide(x,qq){
-  qq=(qq||'').trim().toLowerCase(); if(!qq) return true;
+function coincide(x,term){
+  term=(term||'').trim().toLowerCase(); if(!term) return true;
   return [x.nombre,x.email,x.servicio,x.telefono,x.categoria,x.notas]
-    .some(v=>(v||'').toLowerCase().includes(qq));
+    .some(v=>(v||'').toLowerCase().includes(term));
 }
 function pasaEstado(x,f){ if(!f) return true; return estadoDe(x.vence)===f; }
 
@@ -997,14 +1412,10 @@ document.addEventListener('click',(e)=>{
   }
 
   if(item){
-    if(item.dataset.themeOption){
-      applyTheme(item.dataset.themeOption);
-    }else{
-      const id=item.dataset.id;
-      if(item.dataset.action==='edit') editar(id);
-      else if(item.dataset.action==='label') etiquetar(id);
-      else if(item.dataset.action==='delete') borrar(id);
-    }
+    const id=item.dataset.id;
+    if(item.dataset.action==='edit') editar(id);
+    else if(item.dataset.action==='label') etiquetar(id);
+    else if(item.dataset.action==='delete') borrar(id);
     closeAllMenus();
   }
 });
@@ -1063,26 +1474,14 @@ if(btnEye){ btnEye.addEventListener('click',()=>{ const isPass=f.pin.type==='pas
 /* ===== Chat (Gemini) ===== */
 const GEMINI_API_KEY = 'AIzaSyC9hpKbGmUx3_YcgVGI3AEOdKvWRSoU81k';
 const GEMINI_MODEL  = 'gemini-1.5-flash';
-const chatModal = document.getElementById('chatModal');
-const btnChatOpen = document.getElementById('btnChatOpen');
-const btnChatClose = document.getElementById('btnChatClose');
-const chatLogEl = document.getElementById('chatLog');
-const chatInputEl = document.getElementById('chatInput');
 let chatHistory = JSON.parse(localStorage.getItem('chat_v1')||'[]');
 
-function openChat(){ chatModal.classList.add('open'); chatModal.setAttribute('aria-hidden','false'); setTimeout(()=>chatInputEl?.focus(), 0); }
-function closeChat(){ chatModal.classList.remove('open'); chatModal.setAttribute('aria-hidden','true'); }
-btnChatOpen?.addEventListener('click', openChat);
-btnChatClose?.addEventListener('click', closeChat);
-chatModal?.addEventListener('click', (e)=>{ if(e.target===chatModal) closeChat(); });
-document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') closeChat(); });
-
 function renderChat(){
-  if(!chatLogEl) return;
-  chatLogEl.innerHTML = chatHistory
+  if(!chatUIRefs?.log) return;
+  chatUIRefs.log.innerHTML = chatHistory
     .map(m=>`<div class="chat-msg ${m.role}"><div class="bubble">${esc(m.text)}</div></div>`)
     .join('');
-  chatLogEl.scrollTop = chatLogEl.scrollHeight;
+  chatUIRefs.log.scrollTop = chatUIRefs.log.scrollHeight;
 }
 renderChat();
 
@@ -1106,7 +1505,7 @@ function clientToSafe(rec, includeSecrets){
   return out;
 }
 function buildPrompt(userMsg){
-  const includeSecrets = document.getElementById('shareSecrets')?.checked || false;
+  const includeSecrets = !!(chatUIRefs?.share?.checked);
   const textNorm = normalize(userMsg);
   const clientes = db.getAll();
   const enriched = clientes.map(r=>clientToSafe(r, includeSecrets));
@@ -1140,8 +1539,15 @@ async function requestGemini(prompt){
 }
 
 async function sendChat(){
-  const text = (chatInputEl?.value||'').trim(); if(!text) return;
-  chatHistory.push({ role:'user', text }); renderChat(); chatInputEl.value='';
+  const input=chatUIRefs?.input;
+  const sendBtn=chatUIRefs?.send;
+  if(!input) return;
+  const text=(input.value||'').trim();
+  if(!text) return;
+  chatHistory.push({ role:'user', text });
+  renderChat();
+  input.value='';
+  if(sendBtn){ sendBtn.disabled=true; sendBtn.textContent='Enviando…'; }
   try{
     const reply = await requestGemini(buildPrompt(text));
     chatHistory.push({ role:'ai', text: reply });
@@ -1151,10 +1557,8 @@ async function sendChat(){
   }
   localStorage.setItem('chat_v1', JSON.stringify(chatHistory));
   renderChat();
+  if(sendBtn){ sendBtn.disabled=false; sendBtn.textContent='Enviar'; }
 }
-
-document.getElementById('btnSend')?.addEventListener('click', sendChat);
-chatInputEl?.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }});
 
 /* ==== Herramientas locales para aplicar cambios desde el chat ==== */
 function parseDateToISO(s){
@@ -1259,10 +1663,6 @@ function etiquetar(id){
   }
   try{ runTests(); }catch(e){ console.warn('[tests] fallo:', e); }
 })();
-
-/* ===== Listeners de búsqueda/filtro ===== */
-q?.addEventListener('input', () => renderTabla());
-filterEstado?.addEventListener('change', () => renderTabla());
 
 /* inicio */
 renderServicios().then(()=>renderTabla());

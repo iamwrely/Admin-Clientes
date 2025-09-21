@@ -753,6 +753,19 @@ document.addEventListener('keydown', (e)=>{
   }
 });
 
+document.addEventListener('pointerdown', (event)=>{
+  if(!sidebar) return;
+  if(sidebar.dataset.pinned !== 'true') return;
+  const target = event.target;
+  if(target instanceof Node){
+    if(sidebar.contains(target)) return;
+    if(sidebarLauncher?.contains?.(target)) return;
+  }
+  if(isMobileSidebar()){
+    setSidebarPinned(false);
+  }
+});
+
 // ----- Lógica unificada: registrar o iniciar sesión -----
 async function autoSignInOrUp(email, password) {
   // 1) Intenta iniciar sesión primero

@@ -54,6 +54,25 @@
     .tag.warn{color:#92400e;background:#fffbeb;border-color:#fde68a}
     .tag.bad{color:#7f1d1d;background:#fef2f2;border-color:#fecaca}
 
+    .menu-wrap{position:relative;display:inline-block}
+    .kebab{border:1px solid var(--border);background:#fff;border-radius:12px;padding:6px 10px;cursor:pointer;line-height:1}
+    .kebab .dots{letter-spacing:2px;font-size:18px;color:#64748b}
+    .kebab:focus{outline:2px solid #cbd5e1}
+    .menu{position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 28px rgba(2,6,23,.08);min-width:160px;padding:6px;display:none;z-index:50}
+    .menu.open{display:block}
+    .menu-item{display:block;width:100%;text-align:left;background:#fff;border:0;border-radius:8px;padding:9px 10px;cursor:pointer;font-size:14px}
+    .menu-item:hover{background:#f3f4f6}
+    .menu-item.danger{color:#7f1d1d;border:1px solid #fecaca}
+    .section-head{font-weight:700;margin-bottom:8px;color:var(--ink)}
+    /* ===== Chat (Gemini) ===== */
+    .chat-card{max-width:560px;margin:22px auto 0;border:1px solid var(--border);border-radius:16px;padding:14px;background:#fff}
+    .chat-log{height:260px;overflow:auto;border:1px solid var(--border);border-radius:12px;padding:10px;background:#f9fafb}
+    .chat-msg{margin:8px 0;display:flex}
+    .chat-msg.user{justify-content:flex-end}
+    .chat-msg .bubble{max-width:85%;padding:10px 12px;border-radius:12px;white-space:pre-wrap}
+    .chat-msg.user .bubble{background:#111827;color:#fff;border:1px solid #0b1220}
+    .chat-msg.ai .bubble{background:#fff;border:1px solid var(--border);color:#0b1f16}
+
     @media (max-width:680px){.toolbar-inner{flex-wrap:wrap}}
   </style>
 </head>
@@ -144,6 +163,16 @@
       </thead>
       <tbody></tbody>
     </table>
+
+    <div class="chat-card">
+      <div class="section-head">Asistente (Gemini)</div>
+      <div id="chatLog" class="chat-log"></div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px">
+        <input id="chatInput" placeholder="Escribe un mensaje…"/>
+        <button class="btn primary" id="btnSend">Enviar</button>
+      </div>
+      <div class="small">Conexión directa a Gemini desde el navegador (API key expuesta).</div>
+    </div>
   </div>
 
 <script>
@@ -179,12 +208,96 @@ function renderTabla(){ const arr=db.getAll(); const items=arr.filter(x=>coincid
       <td>${fmt(x.vence)}</td>
       <td>${est?`<span class="tag ${tag}">${estTxt}</span>`:'-'}</td>
       <td>${diasTxt}</td>
-      <td>
-        <button class="btn ghost" onclick="editar('${x.id}')">Editar</button>
-        <button class="btn ghost" style="border-color:#fecaca;color:#7f1d1d" onclick="borrar('${x.id}')">Eliminar</button>
+      <td style="text-align:right">
+        <div class="menu-wrap">
+          <button class="kebab" aria-haspopup="menu" aria-expanded="false"><span class="dots">⋯</span></button>
+          <div class="menu" role="menu">
+            <button class="menu-item" role="menuitem" data-action="edit" data-id="${x.id}">✎ Editar</button>
+            <button class="menu-item danger" role="menuitem" data-action="delete" data-id="${x.id}">🗑 Eliminar</button>
+          </div>
+        </div>
       </td>
     </tr>`; }).join(''); }
 renderTabla();
+
+/* ===== Chat (Gemini) ===== */
+const GEMINI_API_KEY = 'AIzaSyC9hpKbGmUx3_YcgVGI3AEOdKvWRSoU81k'; // ⚠ visible en navegador
+const GEMINI_MODEL  = 'gemini-1.5-flash';
+const chatLogEl = document.getElementById('chatLog');
+const chatInputEl = document.getElementById('chatInput');
+let chatHistory = JSON.parse(localStorage.getItem('chat_v1')||'[]');
+
+function renderChat(){
+  if(!chatLogEl) return;
+  chatLogEl.innerHTML = chatHistory
+    .map(m=>`<div class="chat-msg ${m.role}"><div class="bubble">${esc(m.text)}</div></div>`)
+    .join('');
+  chatLogEl.scrollTop = chatLogEl.scrollHeight;
+}
+renderChat();
+
+function buildPrompt(userMsg){
+  const clientes = db.getAll();
+  const resumen = clientes.slice(0,50)
+    .map(c=>`${c.nombre||'-'} | ${c.servicio||'-'} | vence ${c.vence||'-'}`)
+    .join('\n');
+  return `Eres un asistente que habla español y ayuda a gestionar clientes. ` +
+         `Usa el contexto si es relevante y no inventes datos.\n` +
+         `Contexto (resumen):\n${resumen}\n---\nUsuario: ${userMsg}`;
+}
+
+async function requestGemini(prompt){
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  const payload = { contents: [{ role:'user', parts:[{ text: prompt }]}] };
+  const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  if(!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  return json?.candidates?.[0]?.content?.parts?.[0]?.text || '(sin respuesta)';
+}
+
+async function sendChat(){
+  const text = (chatInputEl?.value||'').trim(); if(!text) return;
+  chatHistory.push({ role:'user', text }); renderChat(); chatInputEl.value='';
+  try{
+    const reply = await requestGemini(buildPrompt(text));
+    chatHistory.push({ role:'ai', text: reply });
+  }catch(err){
+    chatHistory.push({ role:'ai', text: `[Error al llamar a Gemini: ${err.message}]` });
+  }
+  localStorage.setItem('chat_v1', JSON.stringify(chatHistory));
+  renderChat();
+}
+
+document.getElementById('btnSend')?.addEventListener('click', sendChat);
+chatInputEl?.addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }
+});
+
+document.addEventListener('click', (e)=>{
+  const wrap = e.target.closest('.menu-wrap');
+  const isKebab = e.target.closest('.kebab');
+  const item = e.target.closest('.menu-item');
+  if(!wrap && !item){
+    document.querySelectorAll('.menu.open').forEach(m=>{ m.classList.remove('open'); m.previousElementSibling?.setAttribute('aria-expanded','false'); });
+  }
+  if(isKebab){
+    const menu = isKebab.nextElementSibling;
+    document.querySelectorAll('.menu.open').forEach(m=>{ if(m!==menu){ m.classList.remove('open'); m.previousElementSibling?.setAttribute('aria-expanded','false'); }});
+    const isOpen = menu.classList.toggle('open');
+    isKebab.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  }
+  if(item){
+    const id = item.dataset.id;
+    if(item.dataset.action === 'edit') editar(id);
+    if(item.dataset.action === 'delete') borrar(id);
+    document.querySelectorAll('.menu.open').forEach(m=>{ m.classList.remove('open'); m.previousElementSibling?.setAttribute('aria-expanded','false'); });
+  }
+});
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape'){
+    document.querySelectorAll('.menu.open').forEach(m=>{ m.classList.remove('open'); m.previousElementSibling?.setAttribute('aria-expanded','false'); });
+  }
+});
 
 // Mostrar/Ocultar PIN
 const btnEye=document.getElementById('togglePin');

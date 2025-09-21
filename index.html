@@ -53,9 +53,14 @@
     .pin-wrap .eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);border:1px solid var(--ghost-border);background:#fff;border-radius:10px;padding:6px 8px;cursor:pointer}
 
     /* ===== Tabla ===== */
-    table{width:100%;border-collapse:collapse;margin-top:26px}
-    th,td{padding:12px;border-bottom:1px solid var(--border);font-size:14px}
-    th{text-align:left;color:#334155}
+    .table-card{margin-top:26px;background:#fff;border-radius:18px;border:1px solid var(--ghost-border);box-shadow:0 18px 32px rgba(15,23,42,.06);overflow:hidden}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:14px 16px;border-bottom:1px solid var(--border);font-size:14px}
+    th{text-align:left;color:var(--ink-soft);font-weight:700;letter-spacing:.01em;font-size:13px;text-transform:uppercase}
+    td{color:var(--ink);font-weight:500}
+    tbody tr{transition:background-color .2s ease,box-shadow .2s ease}
+    tbody tr:nth-child(even){background:#f8fafc}
+    tbody tr:hover{background:#eef2ff;box-shadow:inset 0 0 0 999px rgba(99,102,241,.08)}
     .tag{font-size:12px;padding:3px 8px;border-radius:999px;display:inline-block;border:1px solid}
     .tag.ok{color:#166534;background:#ecfdf5;border-color:#86efac}
     .tag.warn{color:#92400e;background:#fffbeb;border-color:#fde68a}
@@ -173,15 +178,17 @@
     </div>
 
     <!-- tabla -->
-    <table id="tabla">
-      <thead>
-        <tr>
-          <th>Nombre</th><th>Email</th><th>Servicio</th>
-          <th>Inicio</th><th>Vence</th><th>Estado</th><th>Días</th><th></th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-card">
+      <table id="tabla">
+        <thead>
+          <tr>
+            <th>Nombre</th><th>Email</th><th>Servicio</th>
+            <th>Inicio</th><th>Vence</th><th>Estado</th><th>Días</th><th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 
   <!-- ===== Modal Chat Gemini ===== -->

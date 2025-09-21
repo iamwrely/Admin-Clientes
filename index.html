@@ -1283,23 +1283,22 @@ function buildEtiqueta(c){
   const password = c.password || c.contrasena || c.pass || c.clave || '—';
   const notas = (c.notas || '').trim() || 'Sin notas adicionales.';
 
-  const etiqueta = `🍃 *${svc || 'SERVICIO'}*
-━━━━━━━━━━━━━━━━━━
-🗓️ *Inicio:* ${fi}
+  const etiqueta = `🌈✨ *${svc || 'SERVICIO'}* ✨🌈
+━━━━━━━━━━━━━━━━━━━━
 📅 *Vence:* ${fv}
+🗓️ *Inicio:* ${fi}
 
-👤 *Perfil*
+👥 *Perfil & Acceso*
    • Nombre: ${perfil}
    • Correo: ${correo}
-
-🔐 *Acceso*
-   • PIN: ${pin}
    • Contraseña: ${password}
+   • PIN: ${pin}
+━━━━━━━━━━━━━━━━━━━━
 
-📝 *Notas*
+🌸 *Notas mágicas*
 ${notas}
 
-💻📲  🌟 Gracias por tu compra`;
+💬✨ Lista para WhatsApp`;
 
   // Probado manualmente: el texto se copia correctamente (copyToClipboard) y conserva el formato en WhatsApp.
   return etiqueta;

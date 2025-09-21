@@ -387,7 +387,8 @@
         </div>
         <div class="row">
           <label for="email">Email</label>
-          <input id="email" type="email" placeholder="ej: cliente@mail.com"/>
+          <input id="email" type="email" placeholder="ej: cliente@mail.com" list="emailSuggestions"/>
+          <datalist id="emailSuggestions"></datalist>
         </div>
         <div class="row">
           <label for="telefono">Teléfono</label>
@@ -566,6 +567,23 @@ const themeMenu=document.getElementById('themeMenu');
 const themeOptions=Array.from(themeMenu?.querySelectorAll('[data-theme-option]')||[]);
 const THEME_STORAGE_KEY='ui_theme_mode_v1';
 let editId=null;
+const emailSuggestionsList=document.getElementById('emailSuggestions');
+let linkedAccountsIndex=new Map();
+let lastLinkedAccountSelected=null;
+let linkedAccountSelectionCallback=null;
+
+function setLinkedAccountSelectionCallback(fn){
+  linkedAccountSelectionCallback=typeof fn==='function'? fn:null;
+}
+function getLastLinkedAccountSelection(){
+  return lastLinkedAccountSelected? { ...lastLinkedAccountSelected }:null;
+}
+if(typeof window!=='undefined'){
+  window.setLinkedAccountSelectionCallback=setLinkedAccountSelectionCallback;
+  window.getLastLinkedAccountSelection=getLastLinkedAccountSelection;
+  window.loadLinkedAccounts=loadLinkedAccounts;
+  window.getLinkedAccountsByService=getLinkedAccountsByService;
+}
 
 function isMobileSidebar(){ return sidebarMobileQuery.matches; }
 
@@ -634,7 +652,93 @@ function estadoDe(vence){
   if(!vence) return ''; const d=diasRestantes(vence);
   if(d<0) return 'vencida'; if(d<=7) return 'pronto'; return 'vigente';
 }
-function limpiar(){ editId=null; for(const k in f){ if('value' in f[k]) f[k].value=''; } renderServicios(); msg.textContent=''; }
+function limpiar(){
+  editId=null;
+  for(const k in f){ if('value' in f[k]) f[k].value=''; }
+  Promise.resolve(renderServicios()).then(()=>{
+    rebuildEmailSuggestions();
+    handleEmailSuggestionSelection();
+  });
+  msg.textContent='';
+}
+
+/* ===== Linked accounts & email suggestions ===== */
+function updateLinkedAccountsFrom(records){
+  const index=new Map();
+  (records||[]).forEach(rec=>{
+    if(!rec||typeof rec!=='object') return;
+    const servicio=(rec.servicio||'').toString().trim();
+    const email=(rec.email||'').toString().trim();
+    if(!servicio||!email) return;
+    const key=normalize(servicio);
+    if(!index.has(key)) index.set(key,new Map());
+    const bucket=index.get(key);
+    const emailKey=email.toLowerCase();
+    const payload={
+      servicio,
+      email,
+      pin:rec.pin||'',
+      password:rec.password||rec.contrasena||rec.pass||rec.clave||'',
+      record:rec
+    };
+    bucket.set(emailKey,payload);
+  });
+  linkedAccountsIndex=index;
+  rebuildEmailSuggestions();
+}
+
+async function loadLinkedAccounts(){
+  const arr=await db.fetchAll();
+  updateLinkedAccountsFrom(arr);
+  return arr;
+}
+
+function getLinkedAccountsByService(servicio){
+  const key=normalize(servicio||'');
+  if(!key||!linkedAccountsIndex.has(key)) return [];
+  return Array.from(linkedAccountsIndex.get(key).values()).map(acc=>({ ...acc }));
+}
+
+function findLinkedAccount(servicio,email){
+  const key=normalize(servicio||'');
+  if(!key||!email) return null;
+  const bucket=linkedAccountsIndex.get(key);
+  if(!bucket) return null;
+  const match=bucket.get(email.toLowerCase());
+  return match? { ...match }:null;
+}
+
+function rebuildEmailSuggestions(){
+  if(!emailSuggestionsList) return;
+  const servicioActual=f.servicio?.value||'';
+  const suggestions=getLinkedAccountsByService(servicioActual);
+  const options=suggestions
+    .map(item=>`<option value="${esc(item.email)}"></option>`)
+    .join('');
+  emailSuggestionsList.innerHTML=options;
+}
+
+function applyLinkedAccount(account){
+  if(!account) return;
+  lastLinkedAccountSelected={ ...account };
+  const secret=account.password||account.pin||'';
+  if(secret&&f.pin&&(!f.pin.value||f.pin.value.trim()==='')){
+    f.pin.value=secret;
+  }
+  if(typeof linkedAccountSelectionCallback==='function'){
+    try{ linkedAccountSelectionCallback({ ...account }); }
+    catch(err){ console.warn('onLinkedAccountSelected error', err); }
+  }
+}
+
+function handleEmailSuggestionSelection(){
+  if(!f.email||!f.servicio) return;
+  const servicioActual=f.servicio.value;
+  const emailActual=(f.email.value||'').trim();
+  if(!servicioActual||!emailActual) return;
+  const account=findLinkedAccount(servicioActual,emailActual);
+  if(account) applyLinkedAccount(account);
+}
 
 function updateThemeControls(mode){
   if(themeLabel){ themeLabel.textContent = mode==='light' ? 'Claro' : 'Oscuro'; }
@@ -1229,9 +1333,11 @@ async function renderServicios(sel){
   if(sel && final.includes(sel)) f.servicio.value=sel;
   else if(final.length) f.servicio.value=final[0];
   else f.servicio.value='';
+  rebuildEmailSuggestions();
+  handleEmailSuggestionSelection();
 }
 async function renderTabla(){
-  const arr = await db.fetchAll();
+  const arr = await loadLinkedAccounts();
   const items=arr.filter(x=>coincide(x,q?.value)&&pasaEstado(x,filterEstado?.value));
   tbody.innerHTML=items.map(x=>{
     const d=diasRestantes(x.vence); const est=estadoDe(x.vence);
@@ -1267,6 +1373,23 @@ function coincide(x,qq){
 function pasaEstado(x,f){ if(!f) return true; return estadoDe(x.vence)===f; }
 
 $('#btnLimpiar').onclick=limpiar;
+
+if(f.servicio){
+  ['change','input'].forEach(evt=>{
+    f.servicio.addEventListener(evt,()=>{
+      rebuildEmailSuggestions();
+      handleEmailSuggestionSelection();
+    });
+  });
+}
+if(f.email){
+  ['focus','click'].forEach(evt=>{
+    f.email.addEventListener(evt,rebuildEmailSuggestions);
+  });
+  ['change','input'].forEach(evt=>{
+    f.email.addEventListener(evt,handleEmailSuggestionSelection);
+  });
+}
 
 // *** Agregar/editar cliente ***
 $('#btnGuardar').onclick = async ()=>{

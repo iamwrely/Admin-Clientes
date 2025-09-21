@@ -384,7 +384,8 @@
         </div>
         <div class="row">
           <label for="email">Email</label>
-          <input id="email" type="email" placeholder="ej: cliente@mail.com"/>
+          <input id="email" type="email" placeholder="ej: cliente@mail.com" list="emailSuggestions"/>
+          <datalist id="emailSuggestions"></datalist>
         </div>
         <div class="row">
           <label for="telefono">Teléfono</label>
@@ -531,6 +532,23 @@ const themeMenu=document.getElementById('themeMenu');
 const themeOptions=Array.from(themeMenu?.querySelectorAll('[data-theme-option]')||[]);
 const THEME_STORAGE_KEY='ui_theme_mode_v1';
 let editId=null;
+const emailSuggestionsList=document.getElementById('emailSuggestions');
+let linkedAccountsIndex=new Map();
+let lastLinkedAccountSelected=null;
+let linkedAccountSelectionCallback=null;
+
+function setLinkedAccountSelectionCallback(fn){
+  linkedAccountSelectionCallback=typeof fn==='function'? fn:null;
+}
+function getLastLinkedAccountSelection(){
+  return lastLinkedAccountSelected? { ...lastLinkedAccountSelected }:null;
+}
+if(typeof window!=='undefined'){
+  window.setLinkedAccountSelectionCallback=setLinkedAccountSelectionCallback;
+  window.getLastLinkedAccountSelection=getLastLinkedAccountSelection;
+  window.loadLinkedAccounts=loadLinkedAccounts;
+  window.getLinkedAccountsByService=getLinkedAccountsByService;
+}
 
 function isMobileSidebar(){ return sidebarMobileQuery.matches; }
 
@@ -599,7 +617,93 @@ function estadoDe(vence){
   if(!vence) return ''; const d=diasRestantes(vence);
   if(d<0) return 'vencida'; if(d<=7) return 'pronto'; return 'vigente';
 }
-function limpiar(){ editId=null; for(const k in f){ if('value' in f[k]) f[k].value=''; } renderServicios(); msg.textContent=''; }
+function limpiar(){
+  editId=null;
+  for(const k in f){ if('value' in f[k]) f[k].value=''; }
+  Promise.resolve(renderServicios()).then(()=>{
+    rebuildEmailSuggestions();
+    handleEmailSuggestionSelection();
+  });
+  msg.textContent='';
+}
+
+/* ===== Linked accounts & email suggestions ===== */
+function updateLinkedAccountsFrom(records){
+  const index=new Map();
+  (records||[]).forEach(rec=>{
+    if(!rec||typeof rec!=='object') return;
+    const servicio=(rec.servicio||'').toString().trim();
+    const email=(rec.email||'').toString().trim();
+    if(!servicio||!email) return;
+    const key=normalize(servicio);
+    if(!index.has(key)) index.set(key,new Map());
+    const bucket=index.get(key);
+    const emailKey=email.toLowerCase();
+    const payload={
+      servicio,
+      email,
+      pin:rec.pin||'',
+      password:rec.password||rec.contrasena||rec.pass||rec.clave||'',
+      record:rec
+    };
+    bucket.set(emailKey,payload);
+  });
+  linkedAccountsIndex=index;
+  rebuildEmailSuggestions();
+}
+
+async function loadLinkedAccounts(){
+  const arr=await linkedAccountsStore.fetchAll();
+  updateLinkedAccountsFrom(arr);
+  return arr;
+}
+
+function getLinkedAccountsByService(servicio){
+  const key=normalize(servicio||'');
+  if(!key||!linkedAccountsIndex.has(key)) return [];
+  return Array.from(linkedAccountsIndex.get(key).values()).map(acc=>({ ...acc }));
+}
+
+function findLinkedAccount(servicio,email){
+  const key=normalize(servicio||'');
+  if(!key||!email) return null;
+  const bucket=linkedAccountsIndex.get(key);
+  if(!bucket) return null;
+  const match=bucket.get(email.toLowerCase());
+  return match? { ...match }:null;
+}
+
+function rebuildEmailSuggestions(){
+  if(!emailSuggestionsList) return;
+  const servicioActual=f.servicio?.value||'';
+  const suggestions=getLinkedAccountsByService(servicioActual);
+  const options=suggestions
+    .map(item=>`<option value="${esc(item.email)}"></option>`)
+    .join('');
+  emailSuggestionsList.innerHTML=options;
+}
+
+function applyLinkedAccount(account){
+  if(!account) return;
+  lastLinkedAccountSelected={ ...account };
+  const secret=account.password||account.pin||'';
+  if(secret&&f.pin&&(!f.pin.value||f.pin.value.trim()==='')){
+    f.pin.value=secret;
+  }
+  if(typeof linkedAccountSelectionCallback==='function'){
+    try{ linkedAccountSelectionCallback({ ...account }); }
+    catch(err){ console.warn('onLinkedAccountSelected error', err); }
+  }
+}
+
+function handleEmailSuggestionSelection(){
+  if(!f.email||!f.servicio) return;
+  const servicioActual=f.servicio.value;
+  const emailActual=(f.email.value||'').trim();
+  if(!servicioActual||!emailActual) return;
+  const account=findLinkedAccount(servicioActual,emailActual);
+  if(account) applyLinkedAccount(account);
+}
 
 function updateThemeControls(mode){
   if(themeLabel){ themeLabel.textContent = mode==='light' ? 'Claro' : 'Oscuro'; }
@@ -673,15 +777,110 @@ function saveLocalClients(){
   }
 }
 
+const LOCAL_LINKED_ACCOUNTS_KEY = 'linked_accounts_local_v1';
+function loadLocalLinkedAccounts(){
+  try {
+    const raw = localStorage.getItem(LOCAL_LINKED_ACCOUNTS_KEY);
+    if(!raw) return [];
+    const parsed = JSON.parse(raw);
+    if(Array.isArray(parsed)){
+      return parsed
+        .filter(x=>x && typeof x==='object')
+        .map(x=>({ ...x }));
+    }
+  }catch(err){
+    console.warn('No se pudieron cargar correos enlazados locales', err);
+  }
+  return [];
+}
+let localLinkedAccounts = loadLocalLinkedAccounts();
+function saveLocalLinkedAccounts(){
+  try{
+    localLinkedAccounts = (Array.isArray(localLinkedAccounts)? localLinkedAccounts:[])
+      .filter(x=>x && typeof x==='object')
+      .map(x=>({ ...x }));
+    localStorage.setItem(LOCAL_LINKED_ACCOUNTS_KEY, JSON.stringify(localLinkedAccounts));
+  }catch(err){
+    console.warn('No se pudieron guardar correos enlazados locales', err);
+  }
+}
+
 /* ====== AUTH (Supabase) — modal unificado ====== */
 let currentUser = null;
+
+let cacheLinkedAccounts = localLinkedAccounts.slice();
+const LINKED_ACCOUNTS_TABLE_CANDIDATES = ['linked_accounts','linkedaccounts','linked_emails','correos_enlazados'];
+
+async function fetchLinkedAccountsFromCloud(){
+  if(!currentUser || !currentUser.id){
+    return [];
+  }
+  for(const tableName of LINKED_ACCOUNTS_TABLE_CANDIDATES){
+    try{
+      const { data, error } = await sb
+        .from(tableName)
+        .select('*')
+        .eq('user_id', currentUser.id);
+      if(error){
+        const msg = error?.message || '';
+        if(error?.code === '42P01' || /does not exist/i.test(msg)){
+          continue;
+        }
+        console.warn('No se pudieron cargar correos enlazados', error);
+        return null;
+      }
+      const rows = (Array.isArray(data)? data:[])
+        .filter(x=>x && typeof x==='object')
+        .map(x=>({ ...x }));
+      rows.sort((a,b)=>{
+        const svcA=(a.servicio||'').toString().localeCompare((b.servicio||'').toString());
+        if(svcA!==0) return svcA;
+        return (a.email||'').toString().localeCompare((b.email||'').toString());
+      });
+      return rows;
+    }catch(err){
+      if(err?.code === '42P01'){ continue; }
+      console.warn('No se pudieron cargar correos enlazados', err);
+      return null;
+    }
+  }
+  return [];
+}
+
+const linkedAccountsStore = {
+  getAll(){
+    return (currentUser ? cacheLinkedAccounts : localLinkedAccounts).map(x=>({ ...x }));
+  },
+  async fetchAll(){
+    if(!currentUser){
+      localLinkedAccounts = loadLocalLinkedAccounts();
+      cacheLinkedAccounts = localLinkedAccounts.slice();
+      return cacheLinkedAccounts.map(x=>({ ...x }));
+    }
+    const remote = await fetchLinkedAccountsFromCloud();
+    if(remote===null){
+      localLinkedAccounts = loadLocalLinkedAccounts();
+      cacheLinkedAccounts = localLinkedAccounts.slice();
+    }else{
+      cacheLinkedAccounts = remote.slice();
+    }
+    return cacheLinkedAccounts.map(x=>({ ...x }));
+  }
+};
 
 sb.auth.onAuthStateChange((_e, session)=>{
   currentUser = session?.user || null;
   authUpdateUI();
   // Sincroniza local → nube si la nube está vacía
-  syncLocalServicesToCloudIfEmpty().finally(()=>{
-    renderServicios().then(renderTabla);
+  if(!currentUser){
+    cacheLinkedAccounts = localLinkedAccounts.slice();
+  }else{
+    cacheLinkedAccounts = [];
+  }
+  updateLinkedAccountsFrom(cacheLinkedAccounts);
+  syncLocalServicesToCloudIfEmpty().finally(async ()=>{
+    await renderServicios();
+    await Promise.all([renderTabla(), loadLinkedAccounts()]);
   });
 });
 
@@ -991,6 +1190,8 @@ async function renderServicios(sel){
   if(sel && final.includes(sel)) f.servicio.value=sel;
   else if(final.length) f.servicio.value=final[0];
   else f.servicio.value='';
+  rebuildEmailSuggestions();
+  handleEmailSuggestionSelection();
 }
 async function renderTabla(){
   const arr = await db.fetchAll();
@@ -1029,6 +1230,23 @@ function coincide(x,qq){
 function pasaEstado(x,f){ if(!f) return true; return estadoDe(x.vence)===f; }
 
 $('#btnLimpiar').onclick=limpiar;
+
+if(f.servicio){
+  ['change','input'].forEach(evt=>{
+    f.servicio.addEventListener(evt,()=>{
+      rebuildEmailSuggestions();
+      handleEmailSuggestionSelection();
+    });
+  });
+}
+if(f.email){
+  ['focus','click'].forEach(evt=>{
+    f.email.addEventListener(evt,rebuildEmailSuggestions);
+  });
+  ['change','input'].forEach(evt=>{
+    f.email.addEventListener(evt,handleEmailSuggestionSelection);
+  });
+}
 
 // *** Agregar/editar cliente ***
 $('#btnGuardar').onclick = async ()=>{
@@ -1380,7 +1598,10 @@ q?.addEventListener('input', () => renderTabla());
 filterEstado?.addEventListener('change', () => renderTabla());
 
 /* inicio */
-renderServicios().then(()=>renderTabla());
+renderServicios().then(()=>{
+  renderTabla();
+  loadLinkedAccounts();
+});
 </script>
 </body>
 </html>

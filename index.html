@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin de Clientes</title>
+  <style>
+    :root{--bg:#0f172a;--card:#111827;--muted:#94a3b8;--txt:#e5e7eb;--acc:#22c55e;--danger:#ef4444;--warn:#f59e0b;}
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Inter,Arial}
+    body{margin:0;background:linear-gradient(180deg,#0b1220,#0f172a);}
+    header{padding:18px 20px;color:var(--txt);display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+    h1{margin:0;font-size:20px}
+    .container{max-width:1100px;margin:0 auto;padding:0 16px 48px}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:16px;padding:16px;color:var(--txt);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .grid{display:grid;gap:12px}
+    .grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+    label{font-size:12px;color:var(--muted)}
+    input,select,textarea{width:100%;padding:10px 12px;background:#0b1020;border:1px solid #1f2937;border-radius:10px;color:var(--txt)}
+    textarea{min-height:65px;resize:vertical}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    button{border:0;border-radius:10px;padding:10px 14px;cursor:pointer}
+    .btn{background:#1f2937;color:#e5e7eb}
+    .btn.primary{background:var(--acc);color:#062814;font-weight:600}
+    .btn.warn{background:var(--warn);color:#1f1300}
+    .btn.danger{background:var(--danger);color:#2b0b0b}
+    .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .muted{color:var(--muted);font-size:12px}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{padding:10px;border-bottom:1px solid #1f2937;font-size:14px}
+    th{color:#9ca3af;text-align:left}
+    tr:hover{background:#0e162a}
+    .tag{font-size:12px;padding:3px 8px;border-radius:999px;display:inline-block}
+    .tag.ok{background:rgba(34,197,94,.15);color:#86efac;border:1px solid rgba(34,197,94,.35)}
+    .tag.bad{background:rgba(239,68,68,.15);color:#fecaca;border:1px solid rgba(239,68,68,.35)}
+    .tag.warn{background:rgba(245,158,11,.15);color:#fde68a;border:1px solid rgba(245,158,11,.35)}
+    .section-title{margin:18px 0 8px;color:#cbd5e1;font-weight:600}
+    .help{font-size:12px;color:#9ca3af}
+    .stack-sm{display:flex;flex-direction:column;gap:6px}
+    .right{margin-left:auto}
+    .small{font-size:12px}
+  </style>
+</head>
+<body>
+  <header class="card">
+    <h1>Administración de Clientes</h1>
+    <div class="toolbar right">
+      <input id="q" placeholder="Buscar por nombre, email o servicio…" />
+      <select id="filterEstado">
+        <option value="">Todos</option>
+        <option value="vigente">Vigentes</option>
+        <option value="vencida">Vencidas</option>
+        <option value="pronto">Por vencer (≤7 días)</option>
+      </select>
+      <button class="btn" id="btnExportar">Exportar JSON</button>
+      <label class="btn">
+        Importar JSON
+        <input type="file" id="importFile" accept="application/json" hidden>
+      </label>
+      <button class="btn warn" id="btnBorrarTodo" title="Borra solo los datos del navegador">Borrar todo</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <div class="section-title">Nuevo / Editar cliente</div>
+      <div class="grid cols-3">
+        <div class="stack-sm">
+          <label>Nombre</label>
+          <input id="nombre" />
+        </div>
+        <div class="stack-sm">
+          <label>Email</label>
+          <input id="email" type="email" />
+        </div>
+        <div class="stack-sm">
+          <label>Teléfono</label>
+          <input id="telefono" />
+        </div>
+
+        <div class="stack-sm">
+          <label>Servicio</label>
+          <div class="row">
+            <select id="servicio" style="flex:1"></select>
+            <button class="btn" id="btnAgregarServicio" title="Añadir un servicio nuevo">+ Servicio</button>
+          </div>
+          <div class="help">Elige o crea uno (ej: ChatGPT, Gemini, YouTube, Disney, Scribd, …)</div>
+        </div>
+
+        <div class="stack-sm">
+          <label>Inicio</label>
+          <input id="inicio" type="date" />
+        </div>
+        <div class="stack-sm">
+          <label>Vence</label>
+          <input id="vence" type="date" />
+        </div>
+
+        <div class="stack-sm" style="grid-column:1 / -1">
+          <label>Notas</label>
+          <textarea id="notas" placeholder="Plan, precio, usuario, etc."></textarea>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="btnGuardar">Guardar</button>
+        <button class="btn" id="btnLimpiar">Limpiar</button>
+        <span class="muted" id="msg"></span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="section-title">Clientes</div>
+      <table id="tabla">
+        <thead>
+          <tr>
+            <th>Nombre</th><th>Email</th><th>Servicio</th>
+            <th>Inicio</th><th>Vence</th><th>Estado</th><th>Días</th><th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="small muted" style="margin-top:6px">
+        Los datos se guardan en tu navegador (localStorage). Puedes exportarlos para respaldo.
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ====== Utilidades de almacenamiento ====== */
+const KEY = 'clientes_v1';
+const KEY_SERVS = 'servicios_v1';
+
+const db = {
+  getAll(){ return JSON.parse(localStorage.getItem(KEY) || '[]'); },
+  saveAll(arr){ localStorage.setItem(KEY, JSON.stringify(arr)); },
+  getServicios(){ return JSON.parse(localStorage.getItem(KEY_SERVS) || '["ChatGPT","Gemini","YouTube","Disney"]'); },
+  saveServicios(list){ localStorage.setItem(KEY_SERVS, JSON.stringify(list)); }
+};
+
+/* ====== Elementos ====== */
+const $ = s => document.querySelector(s);
+const tbody = $('#tabla tbody');
+const f = {
+  nombre: $('#nombre'), email: $('#email'), telefono: $('#telefono'),
+  servicio: $('#servicio'), inicio: $('#inicio'), vence: $('#vence'), notas: $('#notas')
+};
+const q = $('#q');
+const filterEstado = $('#filterEstado');
+const msg = $('#msg');
+
+/* ====== Estado ====== */
+let editId = null;
+
+/* ====== Servicios (con “agregar servicio”) ====== */
+function renderServicios(){
+  const list = db.getServicios();
+  f.servicio.innerHTML = list.map(s => `<option value="${s}">${s}</option>`).join('');
+}
+renderServicios();
+
+$('#btnAgregarServicio').onclick = () => {
+  const nombre = prompt('Nombre del nuevo servicio:');
+  if(!nombre) return;
+  const list = db.getServicios();
+  if(!list.includes(nombre)) {
+    list.push(nombre);
+    list.sort((a,b)=>a.localeCompare(b));
+    db.saveServicios(list);
+    renderServicios();
+    f.servicio.value = nombre;
+    toast('Servicio agregado ✓');
+  } else {
+    f.servicio.value = nombre;
+    toast('Servicio ya existía');
+  }
+};
+
+/* ====== Cálculo de estado / días (como tus fórmulas) ====== */
+function diasRestantes(fechaISO){
+  if(!fechaISO) return null;
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const d = new Date(fechaISO); d.setHours(0,0,0,0);
+  return Math.round((d - hoy) / (1000*60*60*24));
+}
+function estadoDe(vence){
+  if(!vence) return '';
+  const d = diasRestantes(vence);
+  if(d < 0) return 'vencida';
+  if(d <= 7) return 'pronto';
+  return 'vigente';
+}
+
+/* ====== CRUD ====== */
+function limpiar(){
+  editId = null;
+  for(const k in f){ f[k].value = ''; }
+  renderServicios();
+  msg.textContent = '';
+}
+$('#btnLimpiar').onclick = limpiar;
+
+$('#btnGuardar').onclick = () => {
+  const data = {
+    id: editId ?? crypto.randomUUID(),
+    nombre: f.nombre.value.trim(),
+    email: f.email.value.trim(),
+    telefono: f.telefono.value.trim(),
+    servicio: f.servicio.value,
+    inicio: f.inicio.value,
+    vence: f.vence.value,
+    notas: f.notas.value.trim(),
+    ts: Date.now()
+  };
+  if(!data.nombre){ toast('Escribe un nombre'); return; }
+
+  const arr = db.getAll();
+  const i = arr.findIndex(x=>x.id===data.id);
+  if(i>=0) arr[i]=data; else arr.push(data);
+  arr.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  db.saveAll(arr);
+  renderTabla();
+  limpiar();
+  toast('Guardado ✓');
+};
+
+function editar(id){
+  const x = db.getAll().find(c=>c.id===id);
+  if(!x) return;
+  editId = x.id;
+  for(const k in f){ if(k in x) f[k].value = x[k] || ''; }
+  msg.textContent = 'Editando… (guarda para aplicar cambios)';
+}
+function borrar(id){
+  if(!confirm('¿Eliminar este cliente?')) return;
+  const arr = db.getAll().filter(c=>c.id!==id);
+  db.saveAll(arr);
+  renderTabla();
+}
+$('#btnBorrarTodo').onclick = () => {
+  if(!confirm('Esto borra TODOS los clientes guardados en este navegador.')) return;
+  db.saveAll([]);
+  renderTabla();
+};
+
+/* ====== Tabla, búsqueda y filtro ====== */
+function coincide(x, q){
+  q = q.trim().toLowerCase();
+  if(!q) return true;
+  return [x.nombre,x.email,x.servicio,x.telefono,x.notas].some(v=>(v||'').toLowerCase().includes(q));
+}
+function pasaEstado(x, filtro){
+  if(!filtro) return true;
+  const est = estadoDe(x.vence);
+  return est === filtro;
+}
+
+function renderTabla(){
+  const arr = db.getAll();
+  const query = q.value;
+  const filt = filterEstado.value;
+  const items = arr.filter(x => coincide(x, query) && pasaEstado(x, filt));
+
+  tbody.innerHTML = items.map(x=>{
+    const d = diasRestantes(x.vence);
+    const est = estadoDe(x.vence);
+    const tag = est==='vigente' ? 'ok' : est==='pronto' ? 'warn' : 'bad';
+    const estTxt = est ? est[0].toUpperCase()+est.slice(1) : '-';
+    const diasTxt = (d==null) ? '-' : (d<0 ? `Vencido ${Math.abs(d)} d` : `Faltan ${d} d`);
+    return `
+      <tr>
+        <td>${esc(x.nombre)}</td>
+        <td>${esc(x.email||'')}</td>
+        <td>${esc(x.servicio||'')}</td>
+        <td>${fmt(x.inicio)}</td>
+        <td>${fmt(x.vence)}</td>
+        <td>${est?`<span class="tag ${tag}">${estTxt}</span>`:'-'}</td>
+        <td>${diasTxt}</td>
+        <td>
+          <button class="btn" onclick="editar('${x.id}')">Editar</button>
+          <button class="btn danger" onclick="borrar('${x.id}')">Eliminar</button>
+        </td>
+      </tr>`;
+  }).join('');
+}
+function esc(s){ return (s||'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[m])); }
+function fmt(iso){ return iso? new Date(iso+'T00:00:00').toLocaleDateString() : '-'; }
+
+q.oninput = renderTabla;
+filterEstado.onchange = renderTabla;
+
+/* ====== Exportar / Importar ====== */
+$('#btnExportar').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(db.getAll(),null,2)],{type:'application/json'}));
+  a.download = 'clientes.json';
+  a.click();
+};
+$('#importFile').onchange = async e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const txt = await file.text();
+  try{
+    const data = JSON.parse(txt);
+    if(!Array.isArray(data)) throw new Error('Formato inválido');
+    db.saveAll(data);
+    renderTabla();
+    toast('Importado ✓');
+  }catch(err){ alert('Archivo no válido'); }
+  e.target.value = '';
+};
+
+/* ====== UX ====== */
+function toast(t){ msg.textContent=t; setTimeout(()=>msg.textContent='',2500); }
+
+/* ====== Inicio ====== */
+renderTabla();
+</script>
+</body>
+</html>

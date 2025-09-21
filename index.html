@@ -11,9 +11,8 @@
     :root{
       --ink:#0f241a; --ink-soft:#334155; --muted:#64748b; --bg:#ffffff;
       --field:#f5f6f8; --field-focus:#ffffff; --border:#e6e7eb;
-      --pill-bg:#edf7f1; --pill-ink:#19603a;
-      --btn:#222426; --btn-ink:#ffffff; --ghost:#ffffff; --ghost-border:#dfe3e8;
-      --ok:#16a34a; --warn:#f59e0b; --bad:#ef4444;
+      --pill-bg:#edf7f1; --pill-ink:#19603a; --btn:#222426; --btn-ink:#ffffff;
+      --ghost:#ffffff; --ghost-border:#dfe3e8; --ok:#16a34a; --warn:#f59e0b; --bad:#ef4444;
     }
     *{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Arial}
     html,body{margin:0;background:var(--bg);color:var(--ink)}
@@ -47,8 +46,6 @@
     textarea{min-height:88px;resize:vertical}
     .actions{display:flex;justify-content:center;gap:10px;margin-top:18px}
     .small{font-size:12px;color:var(--muted);text-align:center;margin-top:8px}
-
-    /* PIN ojo */
     .pin-wrap{position:relative}
     .pin-wrap .eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);border:1px solid var(--ghost-border);background:#fff;border-radius:10px;padding:6px 8px;cursor:pointer}
 
@@ -72,9 +69,15 @@
     .menu-item:hover{background:#f3f4f6}
     .menu-item.danger{color:#7f1d1d;border:1px solid #fecaca}
 
-    /* ===== Chat (Gemini) ===== */
+    /* ===== Modal Chat ===== */
+    .modal-backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(2,6,23,.45);z-index:100}
+    .modal-backdrop.open{display:flex}
+    .modal{background:#fff;border:1px solid var(--border);border-radius:16px;width:min(760px,96vw);max-height:90vh;display:flex;flex-direction:column}
+    .modal header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border)}
+    .modal .body{padding:12px}
+
+    /* ===== Chat (Gemini) dentro del modal ===== */
     .section-head{font-weight:700;margin-bottom:8px;color:var(--ink)}
-    .chat-card{max-width:560px;margin:22px auto 0;border:1px solid var(--border);border-radius:16px;padding:14px;background:#fff}
     .chat-log{height:260px;overflow:auto;border:1px solid var(--border);border-radius:12px;padding:10px;background:#f9fafb}
     .chat-msg{margin:8px 0;display:flex}
     .chat-msg.user{justify-content:flex-end}
@@ -101,7 +104,8 @@
       <label class="btn ghost">Importar JSON
         <input type="file" id="importFile" accept="application/json" hidden>
       </label>
-      <button class="btn ghost" id="btnBorrarTodo" title="Borra los datos locales">Borrar todo</button>
+      <!-- Reemplazo: se quita Borrar todo y se agrega Chat Gemini -->
+      <button class="btn ghost" id="btnChatOpen" title="Abrir chat con Gemini">Chat Gemini</button>
     </div>
   </div>
 
@@ -173,22 +177,29 @@
       </thead>
       <tbody></tbody>
     </table>
+  </div>
 
-    <!-- chat gemini -->
-    <div class="chat-card">
-      <div class="section-head">Asistente (Gemini)</div>
-      <div id="chatLog" class="chat-log"></div>
-      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px">
-        <input id="chatInput" placeholder="Escribe un mensaje…"/>
-        <button class="btn primary" id="btnSend">Enviar</button>
+  <!-- ===== Modal Chat Gemini (oculto por defecto) ===== -->
+  <div id="chatModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-label="Chat Gemini">
+      <header>
+        <strong>Chat Gemini</strong>
+        <button class="btn ghost" id="btnChatClose">Cerrar</button>
+      </header>
+      <div class="body">
+        <div id="chatLog" class="chat-log"></div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px">
+          <input id="chatInput" placeholder="Escribe un mensaje…"/>
+          <button class="btn primary" id="btnSend">Enviar</button>
+        </div>
+        <div class="small">Conexión directa a Gemini desde el navegador (API key expuesta).</div>
       </div>
-      <div class="small">Conexión directa a Gemini desde el navegador (API key expuesta).</div>
     </div>
   </div>
 
 <script>
 /* ===== almacenamiento ===== */
-const KEY='clientes_v5'; const KEY_SERVS='servicios_v5';
+const KEY='clientes_v6'; const KEY_SERVS='servicios_v6';
 const db={
   getAll(){return JSON.parse(localStorage.getItem(KEY)||'[]')},
   saveAll(x){localStorage.setItem(KEY,JSON.stringify(x))},
@@ -227,7 +238,7 @@ function estadoDe(vence){
   if(d<0) return 'vencida'; if(d<=7) return 'pronto'; return 'vigente';
 }
 
-function limpiar(){ editId=null; for(const k in f){ if('value'in f[k]) f[k].value=''; } renderServicios(); msg.textContent=''; }
+function limpiar(){ editId=null; for(const k in f){ if('value' in f[k]) f[k].value=''; } renderServicios(); msg.textContent=''; }
 $('#btnLimpiar').onclick=limpiar;
 
 $('#btnGuardar').onclick=()=>{
@@ -260,7 +271,7 @@ function coincide(x,qq){
 }
 function pasaEstado(x,f){ if(!f) return true; return estadoDe(x.vence)===f; }
 
-function esc(s){return (s||'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[m]))}
+function esc(s){return (s||'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;' }[m]))}
 function fmt(iso){return iso? new Date(iso+'T00:00:00').toLocaleDateString(): '-'}
 
 function renderTabla(){
@@ -320,38 +331,32 @@ document.addEventListener('keydown',(e)=>{
   }
 });
 
-/* Exportar / Importar / Borrar todo */
-$('#btnExportar').onclick=()=>{
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(db.getAll(),null,2)],{type:'application/json'}));
-  a.download='clientes.json'; a.click();
-};
-$('#importFile').onchange=async e=>{
-  const file=e.target.files[0]; if(!file) return;
-  try{ const txt=await file.text(); const data=JSON.parse(txt);
-    if(!Array.isArray(data)) throw 0; db.saveAll(data); renderTabla(); toast('Importado ✓');
-  }catch{ alert('Archivo no válido'); }
-  e.target.value='';
-};
-$('#btnBorrarTodo').onclick=()=>{
-  if(!confirm('Esto borra TODOS los clientes guardados en este navegador.')) return;
-  db.saveAll([]); renderTabla();
-};
+/* Exportar / Importar */
+const btnExp=document.getElementById('btnExportar'); if(btnExp){ btnExp.onclick=()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(db.getAll(),null,2)],{type:'application/json'})); a.download='clientes.json'; a.click(); }; }
+const inputImp=document.getElementById('importFile'); if(inputImp){ inputImp.onchange=async e=>{ const file=e.target.files[0]; if(!file) return; try{ const txt=await file.text(); const data=JSON.parse(txt); if(!Array.isArray(data)) throw 0; db.saveAll(data); renderTabla(); toast('Importado ✓'); }catch{ alert('Archivo no válido'); } e.target.value=''; }; }
 
 /* Mostrar/Ocultar PIN */
-$('#togglePin')?.addEventListener('click',()=>{
-  const isPass=f.pin.type==='password'; f.pin.type=isPass?'text':'password';
-  $('#togglePin').textContent=isPass?'🙈':'👁';
-});
+const btnEye=document.getElementById('togglePin');
+if(btnEye){ btnEye.addEventListener('click',()=>{ const isPass=f.pin.type==='password'; f.pin.type=isPass?'text':'password'; btnEye.textContent=isPass?'🙈':'👁'; }); }
 
 function toast(t){ msg.textContent=t; setTimeout(()=>msg.textContent='',2200); }
 
 /* ===== Chat (Gemini) ===== */
 const GEMINI_API_KEY = 'AIzaSyC9hpKbGmUx3_YcgVGI3AEOdKvWRSoU81k'; // visible en el navegador
 const GEMINI_MODEL  = 'gemini-1.5-flash';
+const chatModal = document.getElementById('chatModal');
+const btnChatOpen = document.getElementById('btnChatOpen');
+const btnChatClose = document.getElementById('btnChatClose');
 const chatLogEl = document.getElementById('chatLog');
 const chatInputEl = document.getElementById('chatInput');
 let chatHistory = JSON.parse(localStorage.getItem('chat_v1')||'[]');
+
+function openChat(){ chatModal.classList.add('open'); chatModal.setAttribute('aria-hidden','false'); setTimeout(()=>chatInputEl?.focus(), 0); }
+function closeChat(){ chatModal.classList.remove('open'); chatModal.setAttribute('aria-hidden','true'); }
+btnChatOpen?.addEventListener('click', openChat);
+btnChatClose?.addEventListener('click', closeChat);
+chatModal?.addEventListener('click', (e)=>{ if(e.target===chatModal) closeChat(); });
+document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') closeChat(); });
 
 function renderChat(){
   if(!chatLogEl) return;
@@ -367,9 +372,15 @@ function buildPrompt(userMsg){
   const resumen = clientes.slice(0,50)
     .map(c=>`${c.nombre||'-'} | ${c.servicio||'-'} | vence ${c.vence||'-'}`)
     .join('\n');
-  return `Eres un asistente que habla español y ayuda a gestionar clientes. ` +
-         `Usa el contexto si es relevante y no inventes datos.\n` +
-         `Contexto (resumen):\n${resumen}\n---\nUsuario: ${userMsg}`;
+  const prompt = [
+    'Eres un asistente que habla español y ayuda a gestionar clientes.',
+    'Usa el contexto si es relevante y no inventes datos.',
+    'Contexto (resumen):',
+    resumen,
+    '---',
+    `Usuario: ${userMsg}`
+  ].join('\n');
+  return prompt;
 }
 
 async function requestGemini(prompt){
@@ -395,9 +406,22 @@ async function sendChat(){
 }
 
 document.getElementById('btnSend')?.addEventListener('click', sendChat);
-chatInputEl?.addEventListener('keydown', e=>{
-  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }
-});
+chatInputEl?.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }});
+
+/* ===== DEV TESTS (para depurar buildPrompt) ===== */
+(function(){
+  function runTests(){
+    const backup = db.getAll;
+    db.getAll = () => ([{nombre:'Ana',servicio:'ChatGPT',vence:'2025-10-01'}]);
+    const p = buildPrompt('Hola');
+    console.assert(p.includes('Ana | ChatGPT | vence 2025-10-01'), 'El resumen no contiene a Ana');
+    console.assert(p.split('\n').length >= 5, 'Se esperan varias líneas en el prompt');
+    db.getAll = backup;
+    console.log('[tests] buildPrompt OK');
+  }
+  // Ejecuta automáticamente; comenta la línea siguiente si no quieres logs en consola
+  try{ runTests(); }catch(e){ console.warn('[tests] fallo:', e); }
+})();
 </script>
 </body>
 </html>

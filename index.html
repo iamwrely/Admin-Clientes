@@ -35,7 +35,8 @@
     /* ===== Servicio centrado ===== */
     .center{display:flex;justify-content:center;align-items:center;gap:10px;margin:8px 0 20px}
     .center .label{color:var(--ink-soft)}
-    .addserv{border:1px dashed var(--border);background:#fff;padding:8px 10px;border-radius:10px;font-size:14px}
+    .addserv{border:1px dashed var(--border);background:#fff;padding:8px 10px;border-radius:10px;font-size:14px;min-width:40px;text-align:center}
+    .addserv.remove{border-color:#fecaca;color:#7f1d1d}
 
     /* ===== Form (labels arriba) ===== */
     .form{max-width:560px;margin:0 auto}
@@ -120,7 +121,8 @@
     <div class="center">
       <div class="label">Servicio</div>
       <select id="servicio" style="max-width:260px"></select>
-      <button id="btnAgregarServicio" class="addserv">+ Servicio</button>
+      <button id="btnAgregarServicio" class="addserv" aria-label="Agregar servicio" title="Agregar servicio">+</button>
+      <button id="btnEliminarServicio" class="addserv remove" aria-label="Eliminar servicio" title="Eliminar servicio">−</button>
     </div>
 
     <div class="form">
@@ -220,18 +222,36 @@ categoria:$('#categoria'), pin:$('#pin')};
 const q=$('#q'), filterEstado=$('#filterEstado'), msg=$('#msg');
 let editId=null;
 
-function renderServicios(){
+function renderServicios(sel){
   const list=db.getServicios();
   f.servicio.innerHTML=list.map(s=>`<option value="${s}">${s}</option>`).join('');
+  if(sel && list.includes(sel)) f.servicio.value=sel;
+  else if(list.length) f.servicio.value=list[0];
+  else f.servicio.value='';
 }
 renderServicios();
 $('#btnAgregarServicio').onclick=()=>{
   const nombre=prompt('Nombre del nuevo servicio:');
   if(!nombre) return;
   const list=db.getServicios();
-  if(!list.includes(nombre)){ list.push(nombre); list.sort((a,b)=>a.localeCompare(b)); db.saveServicios(list); renderServicios(); f.servicio.value=nombre; toast('Servicio agregado ✓'); }
-  else { f.servicio.value=nombre; toast('Servicio ya existía'); }
+  if(!list.includes(nombre)){ list.push(nombre); list.sort((a,b)=>a.localeCompare(b)); db.saveServicios(list); renderServicios(nombre); toast('Servicio agregado ✓'); }
+  else { renderServicios(nombre); toast('Servicio ya existía'); }
 };
+
+// Eliminar servicio seleccionado
+const btnDelServ = $('#btnEliminarServicio');
+if(btnDelServ){ btnDelServ.onclick = ()=>{
+  const current = f.servicio.value;
+  if(!current){ toast('No hay servicio seleccionado'); return; }
+  const list = db.getServicios();
+  if(!list.includes(current)) return;
+  if(!confirm(`¿Eliminar "${current}" de la lista de servicios?
+(No afecta a los clientes existentes).`)) return;
+  const newList = list.filter(s=>s!==current);
+  db.saveServicios(newList);
+  renderServicios();
+  toast('Servicio eliminado ✓');
+}; }
 
 function diasRestantes(iso){
   if(!iso) return null; const h=new Date();h.setHours(0,0,0,0);
@@ -299,6 +319,7 @@ function renderTabla(){
           <button class="kebab" aria-haspopup="menu" aria-expanded="false"><span class="dots">⋯</span></button>
           <div class="menu" role="menu">
             <button class="menu-item" role="menuitem" data-action="edit" data-id="${x.id}">✎ Editar</button>
+            <button class="menu-item" role="menuitem" data-action="label" data-id="${x.id}">🏷 Etiqueta</button>
             <button class="menu-item danger" role="menuitem" data-action="delete" data-id="${x.id}">🗑 Eliminar</button>
           </div>
         </div>
@@ -326,7 +347,8 @@ document.addEventListener('click', (e)=>{
   if(item){
     const id=item.dataset.id;
     if(item.dataset.action==='edit') editar(id);
-    if(item.dataset.action==='delete') borrar(id);
+    else if(item.dataset.action==='label') etiquetar(id);
+    else if(item.dataset.action==='delete') borrar(id);
     document.querySelectorAll('.menu.open').forEach(m=>{ m.classList.remove('open'); m.previousElementSibling?.setAttribute('aria-expanded','false');});
   }
 });
@@ -495,6 +517,42 @@ function applyUpdateCommand(cmd){
   return true;
 }
 
+function formatDM(iso){ if(!iso) return ''; var d=new Date(iso+'T00:00:00'); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
+function buildEtiqueta(c){
+  var svc=(c.servicio||'').toString().toUpperCase();
+  var fv=formatDM(c.vence)||'--/--';
+  var correo=c.email||'';
+  var perfil=c.nombre||'';
+  var pin=c.pin||'';
+  var t='*'+svc+'* ✨ 📧✨ *FV: '+fv+'*
+';
+  t+= '*Correo:* '+correo+'
+';
+  t+= '*Contraseña:* '+'
+';
+  t+= '__________________'+'
+';
+  t+= 'Perfíl:  '+perfil+'
+';
+  t+= 'PIN:  '+pin+'
+';
+  t+= '__________________'+'
+';
+  t+= '💻📲'+'
+';
+  t+= '    🌟 Gracias por tu compra';
+  return t;
+}
+async function copyToClipboard(txt){
+  try{ await navigator.clipboard.writeText(txt); return true; }
+  catch(e){ try{ var ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); return true; }catch(_){ return false; } }
+}
+function etiquetar(id){
+  var c=db.getAll().find(function(x){return x.id===id}); if(!c){ toast('Cliente no encontrado'); return; }
+  var etiqueta = buildEtiqueta(c);
+  copyToClipboard(etiqueta).then(function(ok){ toast(ok?'Etiqueta copiada ✓':'No se pudo copiar'); });
+}
+
 /* ===== DEV TESTS (para depurar buildPrompt) ===== */
 (function(){
   function runTests(){
@@ -526,6 +584,19 @@ function applyUpdateCommand(cmd){
 
       // restore
       db.getAll = realGet; db.saveAll = realSave;
+    })();
+
+    // Tests de eliminación de servicio (store en memoria)
+    (function(){
+      const g = db.getServicios, s = db.saveServicios;
+      let memList = ['ChatGPT','Gemini','YouTube','Disney'];
+      db.getServicios = () => memList.slice();
+      db.saveServicios = (x) => { memList = x.slice(); };
+      const before = db.getServicios();
+      const after  = before.filter(v=>v!=='YouTube');
+      db.saveServicios(after);
+      console.assert(db.getServicios().indexOf('YouTube') === -1, 'Servicio "YouTube" debe eliminarse de la lista');
+      db.getServicios = g; db.saveServicios = s;
     })();
 
     console.log('[tests] OK: buildPrompt & tools');

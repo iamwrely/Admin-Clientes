@@ -431,6 +431,7 @@ async function sendChat(){
   try{
     const reply = await requestGemini(buildPrompt(text));
     chatHistory.push({ role:'ai', text: reply });
+    tryApplyToolFrom(reply, text);
   }catch(err){
     chatHistory.push({ role:'ai', text: `[Error al llamar a Gemini: ${err.message}]` });
   }
@@ -441,23 +442,93 @@ async function sendChat(){
 document.getElementById('btnSend')?.addEventListener('click', sendChat);
 chatInputEl?.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }});
 
+/* ==== Herramientas locales para aplicar cambios solicitados desde el chat ==== */
+function parseDateToISO(s){
+  if(!s) return s; s=String(s).trim();
+  if(s.indexOf('-')>0) return s; // asume YYYY-MM-DD
+  if(s.indexOf('/')>0){ const parts=s.split('/'); if(parts.length===3){ const d=parts[0].padStart(2,'0'); const m=parts[1].padStart(2,'0'); const y=parts[2]; return `${y}-${m}-${d}`; } }
+  return s;
+}
+function extractJson(text){
+  const i = text.indexOf('```json'); if(i>=0){ const j = text.indexOf('```', i+7); if(j>i){ return text.slice(i+7, j).trim(); } }
+  // fallback: intenta primer bloque { ... }
+  const a = text.indexOf('{'); const b = text.lastIndexOf('}');
+  if(a>=0 && b>a) return text.slice(a,b+1);
+  return null;
+}
+function tryApplyToolFrom(modelText, userText){
+  const raw = extractJson(modelText); if(!raw) return false;
+  let cmd; try{ cmd = JSON.parse(raw); }catch{ return false; }
+  if(!cmd || cmd.action !== 'update_client' || !cmd.set) return false;
+  return applyUpdateCommand(cmd);
+}
+function findClientByMatch(match){
+  const arr = db.getAll(); const t = m=>normalize(m||'');
+  let filtered = arr.filter(c=>{
+    const okNombre = match?.nombre? t(c.nombre).includes(t(match.nombre)) : true;
+    const okEmail  = match?.email?  t(c.email) === t(match.email) || t(c.email).includes(t(match.email)) : true;
+    const okServ   = match?.servicio? t(c.servicio).includes(t(match.servicio)) : true;
+    return okNombre && okEmail && okServ;
+  });
+  return filtered;
+}
+function applyUpdateCommand(cmd){
+  const matches = findClientByMatch(cmd.match||{});
+  if(matches.length !== 1){
+    const msg = matches.length===0? 'No encontré un cliente con esos datos. Especifica nombre o email.' : `Hay ${matches.length} clientes que coinciden. Especifica email para continuar.`;
+    chatHistory.push({role:'ai', text: msg});
+    return false;
+  }
+  const client = matches[0];
+  const allowed = {nombre:1,email:1,telefono:1,servicio:1,inicio:1,vence:1,categoria:1,notas:1,pin:1};
+  const set = Object.assign({}, cmd.set);
+  if(set.inicio) set.inicio = parseDateToISO(set.inicio);
+  if(set.vence)  set.vence  = parseDateToISO(set.vence);
+  const arr = db.getAll();
+  const idx = arr.findIndex(x=>x.id===client.id);
+  if(idx<0){ chatHistory.push({role:'ai', text:'Error interno: no se pudo ubicar el registro.'}); return false; }
+  const before = Object.assign({}, arr[idx]);
+  Object.keys(set).forEach(k=>{ if(allowed[k]) arr[idx][k] = set[k]; });
+  db.saveAll(arr); renderTabla();
+  const changed = Object.keys(set).map(k=>`${k}: "${before[k]||''}" → "${arr[idx][k]}"`).join('\n');
+  chatHistory.push({role:'ai', text:`Actualizado ✓\nCliente: ${arr[idx].nombre}\nCambios:\n${changed}`});
+  return true;
+}
+
 /* ===== DEV TESTS (para depurar buildPrompt) ===== */
 (function(){
   function runTests(){
+    // Tests de buildPrompt
     const backup = db.getAll;
     db.getAll = () => ([{id:'1',nombre:'Ana',servicio:'ChatGPT',vence:'2025-10-01',pin:'1234',notas:'vip'}]);
-    // 1) saludo: no debería incluir pin ni notas
     let p0 = buildPrompt('hola');
     console.assert(p0.indexOf('"pin"') === -1, 'No debe incluir pin cuando no se pide');
     console.assert(p0.indexOf('"notas"') === -1, 'No debe incluir notas cuando no se pide');
-    // 2) datos: debe incluir pin
     let p1 = buildPrompt('dame los datos de Ana');
     console.assert(p1.indexOf('"pin"') !== -1, 'Debe incluir pin cuando se piden datos');
-    // 3) notas: debe incluir notas
     let p2 = buildPrompt('muestrame las notas de Ana');
     console.assert(p2.indexOf('"notas"') !== -1, 'Debe incluir notas cuando se piden');
     db.getAll = backup;
-    console.log('[tests] buildPrompt keywords OK');
+
+    // Tests de utilidades locales (sin tocar tu almacenamiento real)
+    (function(){
+      const realGet = db.getAll, realSave = db.saveAll;
+      let mem = [{id:'1',nombre:'Ana',email:'ana@x.com',servicio:'ChatGPT',inicio:'2025-09-20',vence:'2025-10-01',categoria:'Premium',pin:'1234',notas:'vip'}];
+      db.getAll = () => JSON.parse(JSON.stringify(mem));
+      db.saveAll = (x) => { mem = JSON.parse(JSON.stringify(x)); };
+
+      // 1) parseDateToISO dd/mm/aaaa
+      console.assert(parseDateToISO('20/10/2025') === '2025-10-20','parseDateToISO convierte dd/mm/aaaa');
+
+      // 2) aplicar cambio de vence mediante comando
+      applyUpdateCommand({action:'update_client', match:{nombre:'Ana'}, set:{vence:'2025-11-01'}});
+      console.assert(mem[0].vence==='2025-11-01','applyUpdateCommand actualiza vence');
+
+      // restore
+      db.getAll = realGet; db.saveAll = realSave;
+    })();
+
+    console.log('[tests] OK: buildPrompt & tools');
   }
   try{ runTests(); }catch(e){ console.warn('[tests] fallo:', e); }
 })();

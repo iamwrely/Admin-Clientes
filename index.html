@@ -181,7 +181,10 @@
     .pin-wrap .eye:hover,.pin-wrap .eye:focus-visible{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.28)}
     .pin-wrap .eye:focus-visible{outline:2px solid rgba(125,211,252,.35);outline-offset:2px}
 
+    .input-with-actions{display:flex;gap:8px;align-items:center}
+    .input-with-actions input{flex:1;min-width:0}
     .linked-email-wrap{display:flex;gap:10px;align-items:center}
+    .linked-email-wrap .input-with-actions{flex:1}
     .linked-email-wrap input{flex:1}
     .btn.icon-only{width:44px;height:44px;padding:0;display:flex;align-items:center;justify-content:center;font-size:24px;line-height:1}
     .btn.ghost.danger{color:var(--danger);border-color:rgba(249,113,113,.4)}
@@ -403,7 +406,10 @@
         </div>
         <div class="row suggestion-source">
           <label for="email">Email</label>
-          <input id="email" type="email" placeholder="ej: cliente@mail.com" />
+          <div class="input-with-actions">
+            <input id="email" type="email" placeholder="ej: cliente@mail.com" />
+            <button type="button" class="btn ghost icon-only" id="btnEmailPicker" aria-label="Mostrar correos guardados" aria-haspopup="listbox" aria-expanded="false">▾</button>
+          </div>
           <div id="emailSuggestionDropdown" class="suggestion-dropdown" role="listbox" aria-hidden="true"></div>
         </div>
         <div class="row">
@@ -538,12 +544,16 @@
           <label for="linkedService">Servicio</label>
           <select id="linkedService"></select>
         </div>
-        <div class="row">
+        <div class="row suggestion-source">
           <label for="linkedEmail">Correo</label>
           <div class="linked-email-wrap">
-            <input id="linkedEmail" type="email" placeholder="correo@ejemplo.com" autocomplete="off">
+            <div class="input-with-actions">
+              <input id="linkedEmail" type="email" placeholder="correo@ejemplo.com" autocomplete="off">
+              <button class="btn ghost icon-only" id="btnLinkedEmailPicker" type="button" aria-label="Mostrar correos guardados" aria-haspopup="listbox" aria-expanded="false">▾</button>
+            </div>
             <button class="btn ghost danger icon-only" id="btnLinkedDelete" type="button" aria-label="Eliminar correo enlazado">−</button>
           </div>
+          <div id="linkedEmailDropdown" class="suggestion-dropdown" role="listbox" aria-hidden="true"></div>
         </div>
         <div class="row">
           <label for="linkedPassword">Contraseña</label>
@@ -587,13 +597,41 @@ const themeOptions=Array.from(themeMenu?.querySelectorAll('[data-theme-option]')
 const THEME_STORAGE_KEY='ui_theme_mode_v1';
 let editId=null;
 const emailSuggestionDropdown=document.getElementById('emailSuggestionDropdown');
+const btnEmailPicker=document.getElementById('btnEmailPicker');
 let emailSuggestionCache=[];
 let filteredEmailSuggestions=[];
 let activeEmailSuggestionIndex=-1;
 let hideEmailSuggestionTimeout=null;
+let hideLinkedEmailDropdownTimeout=null;
 let linkedAccountsIndex=new Map();
 let lastLinkedAccountSelected=null;
 let linkedAccountSelectionCallback=null;
+
+function linkedServiceKey(servicio){
+  return normalize((servicio||'').toString().trim());
+}
+
+function linkedEmailKey(email){
+  return (email||'').toString().trim().toLowerCase();
+}
+
+function linkedCompositeKey(servicio,email){
+  const svcKey=linkedServiceKey(servicio);
+  const mailKey=linkedEmailKey(email);
+  return svcKey && mailKey? `${svcKey}::${mailKey}`:'';
+}
+
+function getStoredLinkedAccountsForService(servicio){
+  const key=linkedServiceKey(servicio);
+  if(!key) return [];
+  return linkedAccounts.filter(item=>linkedServiceKey(item.servicio)===key);
+}
+
+function findStoredLinkedAccountIndex(servicio,email){
+  const target=linkedCompositeKey(servicio,email);
+  if(!target) return -1;
+  return linkedAccounts.findIndex(item=>linkedCompositeKey(item.servicio,item.email)===target);
+}
 
 function setLinkedAccountSelectionCallback(fn){
   linkedAccountSelectionCallback=typeof fn==='function'? fn:null;
@@ -693,10 +731,10 @@ function updateLinkedAccountsFrom(records){
     const servicio=(rec.servicio||'').toString().trim();
     const email=(rec.email||'').toString().trim();
     if(!servicio||!email) return;
-    const key=normalize(servicio);
+    const key=linkedServiceKey(servicio);
     if(!index.has(key)) index.set(key,new Map());
     const bucket=index.get(key);
-    const emailKey=email.toLowerCase();
+    const emailKey=linkedEmailKey(email);
     const payload={
       servicio,
       email,
@@ -717,19 +755,21 @@ async function refreshLinkedAccountsFromClients(){
 }
 
 function getLinkedAccountsByService(servicio){
-  const key=normalize(servicio||'');
+  const key=linkedServiceKey(servicio||'');
   if(!key||!linkedAccountsIndex.has(key)) return [];
   return Array.from(linkedAccountsIndex.get(key).values()).map(acc=>({ ...acc }));
 }
 
 function findLinkedAccount(servicio,email){
-  const key=normalize(servicio||'');
+  const key=linkedServiceKey(servicio||'');
   if(!key||!email) return null;
   const bucket=linkedAccountsIndex.get(key);
   if(!bucket) return null;
-  const match=bucket.get(email.toLowerCase());
+  const match=bucket.get(linkedEmailKey(email));
   return match? { ...match }:null;
 }
+
+let filteredLinkedEmailSuggestions=[];
 
 function rebuildEmailSuggestions(){
   const servicioActual=f.servicio?.value||'';
@@ -739,6 +779,7 @@ function rebuildEmailSuggestions(){
   }else{
     hideEmailSuggestionDropdown();
   }
+  updateEmailPickerState();
 }
 
 function hideEmailSuggestionDropdown(){
@@ -752,6 +793,7 @@ function hideEmailSuggestionDropdown(){
     clearTimeout(hideEmailSuggestionTimeout);
     hideEmailSuggestionTimeout=null;
   }
+  updateEmailPickerState();
 }
 
 function isEmailSuggestionDropdownOpen(){
@@ -773,6 +815,7 @@ function updateEmailSuggestionDropdown(filterText){
     emailSuggestionDropdown.classList.add('open');
     emailSuggestionDropdown.setAttribute('aria-hidden','false');
     activeEmailSuggestionIndex=-1;
+    updateEmailPickerState();
     return;
   }
 
@@ -796,6 +839,7 @@ function updateEmailSuggestionDropdown(filterText){
       selectEmailSuggestion(idx);
     });
   });
+  updateEmailPickerState();
 }
 
 function highlightEmailSuggestion(idx){
@@ -832,6 +876,94 @@ function selectEmailSuggestion(idx){
 
 function showEmailSuggestions(){
   updateEmailSuggestionDropdown();
+}
+
+function updateEmailPickerState(){
+  if(!btnEmailPicker) return;
+  const servicioActual = f.servicio?.value || '';
+  const hasService = !!servicioActual;
+  btnEmailPicker.disabled = !hasService;
+  btnEmailPicker.setAttribute('aria-expanded', isEmailSuggestionDropdownOpen() && hasService ? 'true':'false');
+}
+
+function hideLinkedEmailDropdown(){
+  if(!linkedEmailDropdown) return;
+  linkedEmailDropdown.classList.remove('open');
+  linkedEmailDropdown.setAttribute('aria-hidden','true');
+  linkedEmailDropdown.innerHTML='';
+  filteredLinkedEmailSuggestions=[];
+  if(hideLinkedEmailDropdownTimeout){
+    clearTimeout(hideLinkedEmailDropdownTimeout);
+    hideLinkedEmailDropdownTimeout=null;
+  }
+  if(btnLinkedEmailPicker){
+    btnLinkedEmailPicker.setAttribute('aria-expanded','false');
+  }
+  updateLinkedEmailPickerState();
+}
+
+function isLinkedEmailDropdownOpen(){
+  return !!linkedEmailDropdown && linkedEmailDropdown.classList.contains('open');
+}
+
+function updateLinkedEmailPickerState(){
+  if(!btnLinkedEmailPicker) return;
+  const servicio = linkedServiceEl?.value || '';
+  const hasService = !!servicio;
+  btnLinkedEmailPicker.disabled = !hasService;
+  btnLinkedEmailPicker.setAttribute('aria-expanded', hasService && isLinkedEmailDropdownOpen() ? 'true':'false');
+}
+
+function updateLinkedEmailDropdown(filterText){
+  if(!linkedEmailDropdown) return;
+  const servicio = linkedServiceEl?.value || '';
+  const hasService = !!servicio;
+  const suggestions = hasService? getLinkedAccountsByService(servicio):[];
+  const term = typeof filterText==='string'
+    ? filterText.trim().toLowerCase()
+    : (linkedEmailEl?.value || '').trim().toLowerCase();
+  filteredLinkedEmailSuggestions = suggestions.filter(item => {
+    return !term || item.email.toLowerCase().includes(term);
+  });
+
+  const emptyLabel = hasService
+    ? (term ? 'Sin coincidencias' : 'Sin correos enlazados')
+    : 'Selecciona un servicio';
+
+  if(!filteredLinkedEmailSuggestions.length){
+    linkedEmailDropdown.innerHTML = `<div class="suggestion-empty">${esc(emptyLabel)}</div>`;
+  }else{
+    const html = filteredLinkedEmailSuggestions.map((item,idx)=>{
+      const hint = item.password || item.pin ? '<span class="suggestion-hint">Contraseña guardada</span>' : '';
+      return `<button type="button" class="suggestion-item" data-index="${idx}" role="option">`
+        + `<span class="suggestion-email">${esc(item.email)}</span>`
+        + hint
+        + `</button>`;
+    }).join('');
+    linkedEmailDropdown.innerHTML = html;
+    Array.from(linkedEmailDropdown.querySelectorAll('.suggestion-item')).forEach(btn=>{
+      btn.addEventListener('mousedown',e=>e.preventDefault());
+      btn.addEventListener('click',()=>{
+        const idx=Number(btn.dataset.index);
+        selectLinkedEmailSuggestion(idx);
+      });
+    });
+  }
+
+  linkedEmailDropdown.classList.add('open');
+  linkedEmailDropdown.setAttribute('aria-hidden','false');
+  if(btnLinkedEmailPicker){
+    btnLinkedEmailPicker.setAttribute('aria-expanded','true');
+  }
+  updateLinkedEmailPickerState();
+}
+
+function selectLinkedEmailSuggestion(idx){
+  const account = filteredLinkedEmailSuggestions[idx];
+  if(!account) return;
+  if(linkedEmailEl) linkedEmailEl.value = account.email;
+  syncLinkedEmailState({ resetPassword: true });
+  hideLinkedEmailDropdown();
 }
 
 function applyLinkedAccount(account){
@@ -935,15 +1067,30 @@ function loadStoredLinkedAccounts(){
     if(!raw) return [];
     const parsed = JSON.parse(raw);
     if(Array.isArray(parsed)){
-      return parsed
+      const cleaned = parsed
         .filter(item => item && typeof item === 'object')
         .map(item => ({
           servicio: String(item.servicio ?? '').trim(),
           email: String(item.email ?? '').trim(),
           password: String(item.password ?? '')
         }))
-        .filter(item => item.servicio && item.email && item.password)
-        .sort((a,b)=>a.servicio.localeCompare(b.servicio));
+        .filter(item => item.servicio && item.email && item.password);
+
+      const seen = new Set();
+      const unique = [];
+      cleaned.forEach(item => {
+        const key = linkedCompositeKey(item.servicio, item.email);
+        if(!key || seen.has(key)) return;
+        seen.add(key);
+        unique.push(item);
+      });
+
+      unique.sort((a,b)=>{
+        const svc=a.servicio.localeCompare(b.servicio);
+        if(svc!==0) return svc;
+        return a.email.localeCompare(b.email);
+      });
+      return unique;
     }
   } catch (err) {
     console.warn('No se pudieron cargar correos enlazados', err);
@@ -952,17 +1099,32 @@ function loadStoredLinkedAccounts(){
 }
 function saveLinkedAccounts(arr){
   try {
-    const normalized = (Array.isArray(arr)? arr:[])
+    const cleaned = (Array.isArray(arr)? arr:[])
       .filter(item => item && typeof item === 'object')
       .map(item => ({
         servicio: String(item.servicio ?? '').trim(),
         email: String(item.email ?? '').trim(),
         password: String(item.password ?? '')
       }))
-      .filter(item => item.servicio && item.email && item.password)
-      .sort((a,b)=>a.servicio.localeCompare(b.servicio));
-    localStorage.setItem(LINKED_ACCOUNTS_KEY, JSON.stringify(normalized));
-    return normalized.slice();
+      .filter(item => item.servicio && item.email && item.password);
+
+    const seen = new Set();
+    const unique = [];
+    cleaned.forEach(item => {
+      const key = linkedCompositeKey(item.servicio, item.email);
+      if(!key || seen.has(key)) return;
+      seen.add(key);
+      unique.push(item);
+    });
+
+    unique.sort((a,b)=>{
+      const svc=a.servicio.localeCompare(b.servicio);
+      if(svc!==0) return svc;
+      return a.email.localeCompare(b.email);
+    });
+
+    localStorage.setItem(LINKED_ACCOUNTS_KEY, JSON.stringify(unique));
+    return unique.slice();
   } catch (err) {
     console.warn('No se pudieron guardar correos enlazados', err);
   }
@@ -1032,25 +1194,59 @@ const btnLinkedSave = document.getElementById('btnLinkedSave');
 const btnLinkedDelete = document.getElementById('btnLinkedDelete');
 const linkedServiceEl = document.getElementById('linkedService');
 const linkedEmailEl = document.getElementById('linkedEmail');
+const linkedEmailDropdown = document.getElementById('linkedEmailDropdown');
 const linkedPasswordEl = document.getElementById('linkedPassword');
 const toggleLinkedPassword = document.getElementById('toggleLinkedPassword');
 const linkedErrorEl = document.getElementById('linkedError');
+const btnLinkedEmailPicker = document.getElementById('btnLinkedEmailPicker');
 
-function applyLinkedAccountToForm(servicio){
-  if(linkedEmailEl) linkedEmailEl.value = '';
+function applyLinkedAccountToForm(servicio,{ preserveEmail=false }={}){
+  const previousEmail = preserveEmail && linkedEmailEl? linkedEmailEl.value.trim():'';
+  if(linkedEmailEl){
+    linkedEmailEl.value = preserveEmail ? previousEmail : '';
+  }
   if(linkedPasswordEl){
     linkedPasswordEl.value = '';
     linkedPasswordEl.type = 'password';
   }
+  hideLinkedEmailDropdown();
   if(toggleLinkedPassword) toggleLinkedPassword.textContent = '👁';
   if(btnLinkedDelete) btnLinkedDelete.disabled = true;
-  if(!servicio) return;
-  const existing = linkedAccounts.find(item => item.servicio === servicio);
-  if(existing){
-    if(linkedEmailEl) linkedEmailEl.value = existing.email;
-    if(linkedPasswordEl) linkedPasswordEl.value = existing.password;
-    if(btnLinkedDelete) btnLinkedDelete.disabled = false;
+  updateLinkedEmailPickerState();
+  if(!servicio){
+    syncLinkedEmailState({ resetPassword: true });
+    return;
   }
+
+  const stored = getStoredLinkedAccountsForService(servicio);
+  let nextEmail = '';
+  if(preserveEmail && previousEmail && stored.some(item => linkedEmailKey(item.email) === linkedEmailKey(previousEmail))){
+    nextEmail = previousEmail;
+  }
+
+  if(linkedEmailEl) linkedEmailEl.value = nextEmail;
+  syncLinkedEmailState({ resetPassword: true });
+}
+
+function syncLinkedEmailState(options={}){
+  const resetPassword = options.resetPassword !== false;
+  const servicio = linkedServiceEl? linkedServiceEl.value:'';
+  const email = linkedEmailEl? linkedEmailEl.value.trim():'';
+  const account = servicio && email? findLinkedAccount(servicio,email):null;
+
+  if(linkedPasswordEl){
+    if(account){
+      linkedPasswordEl.value = account.password || '';
+    }else if(resetPassword){
+      linkedPasswordEl.value = '';
+    }
+    linkedPasswordEl.type = 'password';
+  }
+
+  if(toggleLinkedPassword) toggleLinkedPassword.textContent = '👁';
+  if(btnLinkedDelete) btnLinkedDelete.disabled = !account;
+  updateLinkedEmailPickerState();
+  return account;
 }
 
 async function populateLinkedServices(){
@@ -1078,11 +1274,13 @@ async function populateLinkedServices(){
     linkedServiceEl.appendChild(option);
     linkedServiceEl.disabled = true;
     if(linkedEmailEl){ linkedEmailEl.value=''; linkedEmailEl.disabled = true; }
+    hideLinkedEmailDropdown();
     if(linkedPasswordEl){ linkedPasswordEl.value=''; linkedPasswordEl.disabled = true; linkedPasswordEl.type='password'; }
     if(btnLinkedSave) btnLinkedSave.disabled = true;
     if(toggleLinkedPassword) toggleLinkedPassword.textContent = '👁';
     if(btnLinkedDelete) btnLinkedDelete.disabled = true;
     if(linkedErrorEl) linkedErrorEl.textContent = 'Agrega servicios para enlazar correos.';
+    updateLinkedEmailPickerState();
     return;
   }
 
@@ -1093,6 +1291,7 @@ async function populateLinkedServices(){
   if(toggleLinkedPassword) toggleLinkedPassword.textContent = '👁';
   if(btnLinkedDelete) btnLinkedDelete.disabled = true;
   if(linkedErrorEl) linkedErrorEl.textContent = '';
+  updateLinkedEmailPickerState();
 
   const placeholder = document.createElement('option');
   placeholder.value = '';
@@ -1121,6 +1320,8 @@ async function populateLinkedServices(){
 function openLinkedModal(){
   if(!linkedModal) return;
   if(linkedErrorEl) linkedErrorEl.textContent='';
+  hideLinkedEmailDropdown();
+  updateLinkedEmailPickerState();
   linkedModal.classList.add('open');
   linkedModal.setAttribute('aria-hidden','false');
   populateLinkedServices().finally(()=>{
@@ -1139,6 +1340,7 @@ function closeLinkedModal(){
   if(linkedPasswordEl) linkedPasswordEl.type='password';
   if(toggleLinkedPassword) toggleLinkedPassword.textContent='👁';
   if(linkedErrorEl) linkedErrorEl.textContent='';
+  hideLinkedEmailDropdown();
 }
 
 btnLinkedOpen?.addEventListener('click', openLinkedModal);
@@ -1152,6 +1354,68 @@ linkedServiceEl?.addEventListener('change', ()=>{
   if(linkedErrorEl) linkedErrorEl.textContent='';
 });
 
+linkedEmailEl?.addEventListener('focus', ()=>{
+  if(linkedErrorEl) linkedErrorEl.textContent='';
+  if(hideLinkedEmailDropdownTimeout){
+    clearTimeout(hideLinkedEmailDropdownTimeout);
+    hideLinkedEmailDropdownTimeout=null;
+  }
+  if(linkedServiceEl?.value){
+    updateLinkedEmailDropdown(linkedEmailEl.value);
+  }
+});
+
+linkedEmailEl?.addEventListener('click', ()=>{
+  if(linkedErrorEl) linkedErrorEl.textContent='';
+  if(hideLinkedEmailDropdownTimeout){
+    clearTimeout(hideLinkedEmailDropdownTimeout);
+    hideLinkedEmailDropdownTimeout=null;
+  }
+  if(linkedServiceEl?.value){
+    updateLinkedEmailDropdown(linkedEmailEl.value);
+  }
+});
+
+linkedEmailEl?.addEventListener('input', ()=>{
+  if(linkedErrorEl) linkedErrorEl.textContent='';
+  if(isLinkedEmailDropdownOpen()){
+    updateLinkedEmailDropdown(linkedEmailEl.value);
+  }
+  syncLinkedEmailState({ resetPassword: true });
+});
+
+linkedEmailEl?.addEventListener('change', ()=>{
+  if(linkedErrorEl) linkedErrorEl.textContent='';
+  if(isLinkedEmailDropdownOpen()){
+    updateLinkedEmailDropdown(linkedEmailEl.value);
+  }
+  syncLinkedEmailState({ resetPassword: true });
+});
+
+linkedEmailEl?.addEventListener('blur', ()=>{
+  hideLinkedEmailDropdownTimeout=setTimeout(()=>hideLinkedEmailDropdown(),120);
+});
+
+btnLinkedEmailPicker?.addEventListener('click', ()=>{
+  if(linkedErrorEl) linkedErrorEl.textContent='';
+  if(!linkedServiceEl || !linkedServiceEl.value){
+    hideLinkedEmailDropdown();
+    updateLinkedEmailPickerState();
+    linkedServiceEl?.focus();
+    return;
+  }
+  if(hideLinkedEmailDropdownTimeout){
+    clearTimeout(hideLinkedEmailDropdownTimeout);
+    hideLinkedEmailDropdownTimeout=null;
+  }
+  if(isLinkedEmailDropdownOpen()){
+    hideLinkedEmailDropdown();
+  }else{
+    updateLinkedEmailDropdown(linkedEmailEl?.value || '');
+    linkedEmailEl?.focus();
+  }
+});
+
 toggleLinkedPassword?.addEventListener('click', ()=>{
   if(!linkedPasswordEl) return;
   const isPass = linkedPasswordEl.type==='password';
@@ -1160,15 +1424,21 @@ toggleLinkedPassword?.addEventListener('click', ()=>{
 });
 
 btnLinkedDelete?.addEventListener('click', ()=>{
-  if(!linkedServiceEl) return;
+  if(!linkedServiceEl || !linkedEmailEl) return;
   const servicio = linkedServiceEl.value;
+  const email = linkedEmailEl.value.trim();
   if(linkedErrorEl) linkedErrorEl.textContent='';
   if(!servicio){
     if(linkedErrorEl) linkedErrorEl.textContent = 'Selecciona un servicio.';
     linkedServiceEl.focus();
     return;
   }
-  const idx = linkedAccounts.findIndex(item => item.servicio === servicio);
+  if(!email){
+    if(linkedErrorEl) linkedErrorEl.textContent = 'Selecciona un correo guardado.';
+    linkedEmailEl.focus();
+    return;
+  }
+  const idx = findStoredLinkedAccountIndex(servicio, email);
   if(idx < 0){
     applyLinkedAccountToForm(servicio);
     toast('No hay correo enlazado para eliminar.');
@@ -1220,10 +1490,11 @@ btnLinkedSave?.addEventListener('click', ()=>{
   }
 
   const payload = { servicio, email, password };
-  const idx = linkedAccounts.findIndex(item => item.servicio === servicio);
+  const idx = findStoredLinkedAccountIndex(servicio, email);
   if(idx>=0) linkedAccounts[idx] = payload; else linkedAccounts.push(payload);
   linkedAccounts = saveLinkedAccounts(linkedAccounts);
   updateLinkedAccountsFrom(linkedAccounts);
+  applyLinkedAccountToForm(servicio);
   handleEmailSuggestionSelection();
   toast('Correo enlazado guardado ✓');
   closeLinkedModal();
@@ -1496,6 +1767,7 @@ async function renderServicios(sel){
   else f.servicio.value='';
   rebuildEmailSuggestions();
   handleEmailSuggestionSelection();
+  updateEmailPickerState();
 }
 async function renderTabla(){
   const arr = await db.fetchAll();
@@ -1553,10 +1825,12 @@ if(f.email){
     rebuildEmailSuggestions();
     updateEmailSuggestionDropdown(f.email.value);
     showEmailSuggestions();
+    updateEmailPickerState();
   });
   f.email.addEventListener('click',()=>{
     rebuildEmailSuggestions();
     showEmailSuggestions();
+    updateEmailPickerState();
   });
   f.email.addEventListener('input',()=>{
     updateEmailSuggestionDropdown(f.email.value);
@@ -1593,6 +1867,20 @@ if(f.email){
     hideEmailSuggestionTimeout=setTimeout(()=>hideEmailSuggestionDropdown(),120);
   });
 }
+btnEmailPicker?.addEventListener('click',()=>{
+  if(!f.servicio || !f.servicio.value){
+    hideEmailSuggestionDropdown();
+    updateEmailPickerState();
+    return;
+  }
+  rebuildEmailSuggestions();
+  if(isEmailSuggestionDropdownOpen()){
+    hideEmailSuggestionDropdown();
+  }else{
+    showEmailSuggestions();
+    f.email?.focus();
+  }
+});
 if(emailSuggestionDropdown){
   emailSuggestionDropdown.addEventListener('mouseenter',()=>{
     if(hideEmailSuggestionTimeout){
@@ -1604,13 +1892,35 @@ if(emailSuggestionDropdown){
     hideEmailSuggestionTimeout=setTimeout(()=>hideEmailSuggestionDropdown(),120);
   });
 }
+if(linkedEmailDropdown){
+  linkedEmailDropdown.addEventListener('mouseenter',()=>{
+    if(hideLinkedEmailDropdownTimeout){
+      clearTimeout(hideLinkedEmailDropdownTimeout);
+      hideLinkedEmailDropdownTimeout=null;
+    }
+  });
+  linkedEmailDropdown.addEventListener('mouseleave',()=>{
+    hideLinkedEmailDropdownTimeout=setTimeout(()=>hideLinkedEmailDropdown(),120);
+  });
+}
 document.addEventListener('pointerdown',(event)=>{
-  if(!f.email || !emailSuggestionDropdown) return;
   const target=event.target;
-  if(target===f.email) return;
-  if(emailSuggestionDropdown.contains(target)) return;
-  hideEmailSuggestionDropdown();
+  if(f.email && emailSuggestionDropdown){
+    const emailRow = f.email.closest('.row');
+    if(!(emailRow?.contains(target) || emailSuggestionDropdown.contains(target))){
+      hideEmailSuggestionDropdown();
+    }
+  }
+  if(linkedEmailEl && linkedEmailDropdown && isLinkedEmailDropdownOpen()){
+    const linkedRow = linkedEmailEl.closest('.row');
+    if(!(linkedRow?.contains(target) || linkedEmailDropdown.contains(target))){
+      hideLinkedEmailDropdown();
+    }
+  }
 });
+
+updateEmailPickerState();
+updateLinkedEmailPickerState();
 
 // *** Agregar/editar cliente ***
 $('#btnGuardar').onclick = async ()=>{

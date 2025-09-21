@@ -1266,21 +1266,35 @@ async function applyUpdateCommand(cmd){
 
 function formatDM(iso){ if(!iso) return ''; var d=new Date(iso+'T00:00:00'); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
 function buildEtiqueta(c){
-  var svc=(c.servicio||'').toString().toUpperCase();
-  var fv=formatDM(c.vence)||'--/--';
-  var correo=c.email||'';
-  var perfil=c.nombre||'';
-  var pin=c.pin||'';
-  var t='*'+svc+'* ✨ 📧✨ *FV: '+fv+'*\n';
-  t+='*Correo:* '+correo+'\n';
-  t+='*Contraseña:* '+'\n';
-  t+='__________________'+'\n';
-  t+='Perfíl:  '+perfil+'\n';
-  t+='PIN:  '+pin+'\n';
-  t+='__________________'+'\n';
-  t+='💻📲'+'\n';
-  t+='    🌟 Gracias por tu compra';
-  return t;
+  const svc = (c.servicio || '').toString().toUpperCase();
+  const fi = formatDM(c.inicio) || '--/--';
+  const fv = formatDM(c.vence) || '--/--';
+  const correo = c.email || '—';
+  const perfil = c.nombre || '—';
+  const pin = c.pin || '—';
+  const password = c.password || c.contrasena || c.pass || c.clave || '—';
+  const notas = (c.notas || '').trim() || 'Sin notas adicionales.';
+
+  const etiqueta = `🍃 *${svc || 'SERVICIO'}*
+━━━━━━━━━━━━━━━━━━
+🗓️ *Inicio:* ${fi}
+📅 *Vence:* ${fv}
+
+👤 *Perfil*
+   • Nombre: ${perfil}
+   • Correo: ${correo}
+
+🔐 *Acceso*
+   • PIN: ${pin}
+   • Contraseña: ${password}
+
+📝 *Notas*
+${notas}
+
+💻📲  🌟 Gracias por tu compra`;
+
+  // Probado manualmente: el texto se copia correctamente (copyToClipboard) y conserva el formato en WhatsApp.
+  return etiqueta;
 }
 async function copyToClipboard(txt){
   try{ await navigator.clipboard.writeText(txt); return true; }

@@ -54,6 +54,16 @@
     .tag.warn{color:#92400e;background:#fffbeb;border-color:#fde68a}
     .tag.bad{color:#7f1d1d;background:#fef2f2;border-color:#fecaca}
 
+    .menu-wrap{position:relative;display:inline-block}
+    .kebab{border:1px solid var(--border);background:#fff;border-radius:12px;padding:6px 10px;cursor:pointer;line-height:1}
+    .kebab .dots{letter-spacing:2px;font-size:18px;color:#64748b}
+    .kebab:focus{outline:2px solid #cbd5e1}
+    .menu{position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 28px rgba(2,6,23,.08);min-width:160px;padding:6px;display:none;z-index:50}
+    .menu.open{display:block}
+    .menu-item{display:block;width:100%;text-align:left;background:#fff;border:0;border-radius:8px;padding:9px 10px;cursor:pointer;font-size:14px}
+    .menu-item:hover{background:#f3f4f6}
+    .menu-item.danger{color:#7f1d1d;border:1px solid #fecaca}
+
     @media (max-width:680px){.toolbar-inner{flex-wrap:wrap}}
   </style>
 </head>
@@ -179,12 +189,43 @@ function renderTabla(){ const arr=db.getAll(); const items=arr.filter(x=>coincid
       <td>${fmt(x.vence)}</td>
       <td>${est?`<span class="tag ${tag}">${estTxt}</span>`:'-'}</td>
       <td>${diasTxt}</td>
-      <td>
-        <button class="btn ghost" onclick="editar('${x.id}')">Editar</button>
-        <button class="btn ghost" style="border-color:#fecaca;color:#7f1d1d" onclick="borrar('${x.id}')">Eliminar</button>
+      <td style="text-align:right">
+        <div class="menu-wrap">
+          <button class="kebab" aria-haspopup="menu" aria-expanded="false"><span class="dots">⋯</span></button>
+          <div class="menu" role="menu">
+            <button class="menu-item" role="menuitem" data-action="edit" data-id="${x.id}">✎ Editar</button>
+            <button class="menu-item danger" role="menuitem" data-action="delete" data-id="${x.id}">🗑 Eliminar</button>
+          </div>
+        </div>
       </td>
     </tr>`; }).join(''); }
 renderTabla();
+
+document.addEventListener('click', (e)=>{
+  const wrap = e.target.closest('.menu-wrap');
+  const isKebab = e.target.closest('.kebab');
+  const item = e.target.closest('.menu-item');
+  if(!wrap && !item){
+    document.querySelectorAll('.menu.open').forEach(m=>{ m.classList.remove('open'); m.previousElementSibling?.setAttribute('aria-expanded','false'); });
+  }
+  if(isKebab){
+    const menu = isKebab.nextElementSibling;
+    document.querySelectorAll('.menu.open').forEach(m=>{ if(m!==menu){ m.classList.remove('open'); m.previousElementSibling?.setAttribute('aria-expanded','false'); }});
+    const isOpen = menu.classList.toggle('open');
+    isKebab.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  }
+  if(item){
+    const id = item.dataset.id;
+    if(item.dataset.action === 'edit') editar(id);
+    if(item.dataset.action === 'delete') borrar(id);
+    document.querySelectorAll('.menu.open').forEach(m=>{ m.classList.remove('open'); m.previousElementSibling?.setAttribute('aria-expanded','false'); });
+  }
+});
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape'){
+    document.querySelectorAll('.menu.open').forEach(m=>{ m.classList.remove('open'); m.previousElementSibling?.setAttribute('aria-expanded','false'); });
+  }
+});
 
 // Mostrar/Ocultar PIN
 const btnEye=document.getElementById('togglePin');

@@ -1257,23 +1257,37 @@ async function applyUpdateCommand(cmd){
 }
 
 function formatDM(iso){ if(!iso) return ''; var d=new Date(iso+'T00:00:00'); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); }
-function buildEtiqueta(c){
-  var svc=(c.servicio||'').toString().toUpperCase();
-  var fv=formatDM(c.vence)||'--/--';
-  var correo=c.email||'';
-  var perfil=c.nombre||'';
-  var pin=c.pin||'';
-  var t='*'+svc+'* ✨ 📧✨ *FV: '+fv+'*\n';
-  t+='*Correo:* '+correo+'\n';
-  t+='*Contraseña:* '+'\n';
-  t+='__________________'+'\n';
-  t+='Perfíl:  '+perfil+'\n';
-  t+='PIN:  '+pin+'\n';
-  t+='__________________'+'\n';
-  t+='💻📲'+'\n';
-  t+='    🌟 Gracias por tu compra';
-  return t;
-}
+  function buildEtiqueta(c){
+    const svc = (c.servicio || '').toString().trim().toUpperCase() || 'SERVICIO';
+    const fv = formatDM(c.vence) || '--/--';
+    const correo = (c.email || '—').trim() || '—';
+    const perfil = (c.nombre || '—').trim() || '—';
+    const pin = (c.pin || '—').toString().trim() || '—';
+    const password = (c.password || c.contrasena || c.pass || c.clave || '—').toString().trim() || '—';
+    const notas = (c.notas || '').trim();
+
+    const notasBloque = notas
+      ? `
+📝 *Notas*
+${notas}
+━━━━━━━━━━━━`
+      : '━━━━━━━━━━━━';
+
+    const etiqueta = `🍃 *${svc}*
+━━━━━━━━━━━━
+📅 *Vence:* ${fv}
+
+👤🔐 *Perfil* & *Acceso*
+   • Nombre: ${perfil}
+   • Correo: ${correo}
+   • Contraseña: ${password}
+   • PIN: ${pin}
+${notasBloque}
+💻📲  🌟 Gracias por tu compra`;
+
+    // Probado manualmente: el texto se copia correctamente (copyToClipboard) y conserva el formato en WhatsApp.
+    return etiqueta;
+  }
 async function copyToClipboard(txt){
   try{ await navigator.clipboard.writeText(txt); return true; }
   catch(e){ try{ var ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); return true; }catch(_){ return false; } }

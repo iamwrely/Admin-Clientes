@@ -85,6 +85,10 @@
     .chat-msg.user .bubble{background:#111827;color:#fff;border:1px solid #0b1220}
     .chat-msg.ai .bubble{background:#fff;border:1px solid var(--border);color:#0b1f16}
 
+    /* Opciones del modal */
+    .optline{margin-top:8px;font-size:12px;color:#334155;display:flex;align-items:center;gap:6px}
+    .optline input{margin-right:6px}
+
     @media (max-width:680px){ .toolbar-inner{flex-wrap:wrap} }
   </style>
 </head>
@@ -192,6 +196,7 @@
           <input id="chatInput" placeholder="Escribe un mensaje…"/>
           <button class="btn primary" id="btnSend">Enviar</button>
         </div>
+        <div class="optline"><label><input type="checkbox" id="shareSecrets"> Compartir datos sensibles (PIN y notas)</label></div>
         <div class="small">Conexión directa a Gemini desde el navegador (API key expuesta).</div>
       </div>
     </div>
@@ -367,18 +372,46 @@ function renderChat(){
 }
 renderChat();
 
+function normalize(s){return (s||'').toString().normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();}
+function clientToSafe(rec, includeSecrets){
+  const d = (function(iso){ if(!iso) return null; const h=new Date();h.setHours(0,0,0,0); const dd=new Date(iso); dd.setHours(0,0,0,0); return Math.round((dd-h)/(1000*60*60*24)); })(rec.vence);
+  const est = rec.vence? (d<0?'vencida':(d<=7?'pronto':'vigente')) : '';
+  const out = {
+    id: rec.id,
+    nombre: rec.nombre||'',
+    email: rec.email||'',
+    telefono: rec.telefono||'',
+    servicio: rec.servicio||'',
+    inicio: rec.inicio||'',
+    vence: rec.vence||'',
+    categoria: rec.categoria||'',
+    estado: est,
+    dias: d
+  };
+  if(includeSecrets){ if(rec.pin) out.pin = rec.pin; if(rec.notas) out.notas = rec.notas; }
+  return out;
+}
 function buildPrompt(userMsg){
+  const includeSecrets = document.getElementById('shareSecrets')?.checked || false;
+  const textNorm = normalize(userMsg);
   const clientes = db.getAll();
-  const resumen = clientes.slice(0,50)
-    .map(c=>`${c.nombre||'-'} | ${c.servicio||'-'} | vence ${c.vence||'-'}`)
-    .join('\n');
-  const prompt = [
+  const enriched = clientes.map(r=>clientToSafe(r, includeSecrets));
+  const matches = enriched.filter(r=>{
+    const n=normalize(r.nombre), e=normalize(r.email), s=normalize(r.servicio);
+    return (n && textNorm.includes(n)) || (e && textNorm.includes(e)) || (s && textNorm.includes(s));
+  });
+  const context = (matches.length? matches.slice(0,10) : enriched.slice(0,50));
+  const guidance = [
     'Eres un asistente que habla español y ayuda a gestionar clientes.',
-    'Usa el contexto si es relevante y no inventes datos.',
-    'Contexto (resumen):',
-    resumen,
-    '---',
-    `Usuario: ${userMsg}`
+    'Usa SOLO los datos proporcionados. Si algo no está en DATOS, di: "no está en mis registros".',
+    'Si el usuario pide PIN y no existe el campo "pin" en los DATOS, responde brevemente que por seguridad no lo compartes a menos que el usuario habilite Compartir datos sensibles.',
+    'Formatea las respuestas de ficha con etiquetas: Nombre, Email, Teléfono, Servicio, Inicio, Vence, Estado, Días, Categoría, Notas.'
+  ];
+  const prompt = [
+    ...guidance,
+    'DATOS(JSON):',
+    JSON.stringify(context),
+    `PREGUNTA: ${userMsg}`
   ].join('\n');
   return prompt;
 }
@@ -412,14 +445,20 @@ chatInputEl?.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey)
 (function(){
   function runTests(){
     const backup = db.getAll;
-    db.getAll = () => ([{nombre:'Ana',servicio:'ChatGPT',vence:'2025-10-01'}]);
-    const p = buildPrompt('Hola');
-    console.assert(p.includes('Ana | ChatGPT | vence 2025-10-01'), 'El resumen no contiene a Ana');
-    console.assert(p.split('\n').length >= 5, 'Se esperan varias líneas en el prompt');
+    db.getAll = () => ([{id:'1',nombre:'Ana',servicio:'ChatGPT',vence:'2025-10-01',pin:'1234',notas:'vip'}]);
+    // 1) saludo: no debería incluir pin ni notas
+    let p0 = buildPrompt('hola');
+    console.assert(p0.indexOf('"pin"') === -1, 'No debe incluir pin cuando no se pide');
+    console.assert(p0.indexOf('"notas"') === -1, 'No debe incluir notas cuando no se pide');
+    // 2) datos: debe incluir pin
+    let p1 = buildPrompt('dame los datos de Ana');
+    console.assert(p1.indexOf('"pin"') !== -1, 'Debe incluir pin cuando se piden datos');
+    // 3) notas: debe incluir notas
+    let p2 = buildPrompt('muestrame las notas de Ana');
+    console.assert(p2.indexOf('"notas"') !== -1, 'Debe incluir notas cuando se piden');
     db.getAll = backup;
-    console.log('[tests] buildPrompt OK');
+    console.log('[tests] buildPrompt keywords OK');
   }
-  // Ejecuta automáticamente; comenta la línea siguiente si no quieres logs en consola
   try{ runTests(); }catch(e){ console.warn('[tests] fallo:', e); }
 })();
 </script>

@@ -221,8 +221,20 @@
     .chat-msg.ai .bubble{background:var(--ai-bubble-bg);border:1px solid var(--ai-bubble-border);color:var(--ink);box-shadow:0 10px 24px rgba(0,0,0,.4)}
 
     /* ===== Tokens de tema ===== */
-    .toolbar{background:var(--toolbar-bg)}
-    .toolbar input,.toolbar select{border:1px solid var(--input-border);background:var(--input-bg);color:var(--ink)}
+    .toolbar{background:var(--toolbar-bg);position:sticky;top:0;z-index:20;display:flex;align-items:center;padding:8px 12px}
+    .menu-toggle{background:transparent;border:none;font-size:24px;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:8px;transition:background .2s ease}
+    .menu-toggle:hover,.menu-toggle:focus-visible{background:rgba(255,255,255,.08)}
+    .menu-toggle.close{position:absolute;top:12px;right:12px;font-size:22px}
+    .sidebar{position:fixed;inset:0 auto 0 0;width:280px;max-width:80vw;background:var(--card-bg);box-shadow:20px 0 40px rgba(0,0,0,.35);transform:translateX(-110%);transition:transform .3s ease;z-index:40;padding:60px 20px 20px;display:flex;flex-direction:column}
+    .sidebar.open,.sidebar[aria-hidden="false"]{transform:translateX(0)}
+    .sidebar-content{position:relative;height:100%;overflow-y:auto}
+    .sidebar-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:16px}
+    .sidebar-list li{display:flex;flex-direction:column;gap:8px;color:var(--ink)}
+    .sidebar-list li button.btn{align-self:flex-start}
+    .auth-controls{gap:12px}
+    .sidebar input,.sidebar select{border:1px solid var(--input-border);background:var(--input-bg);color:var(--ink)}
+    .sidebar-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:30}
+    .sidebar-backdrop.visible{opacity:1;pointer-events:auto}
     .btn.ghost:hover,.btn.ghost:focus-visible{background:var(--ghost-hover-bg);border-color:var(--ghost-hover-border)}
     .btn.ghost:active{background:var(--ghost-active-bg);border-color:var(--ghost-active-border)}
     .pill{border:1px solid var(--border)}
@@ -249,40 +261,58 @@
     .theme-btn-label{display:flex;align-items:center;gap:6px}
     .theme-btn-icon{font-size:12px;opacity:.8}
 
-    @media (max-width:680px){ .toolbar-inner{flex-wrap:wrap} }
+    @media (max-width:680px){ .sidebar{width:240px} }
   </style>
 </head>
 <body>
   <!-- toolbar -->
   <div class="toolbar">
-    <div class="toolbar-inner">
-      <input id="q" placeholder="Buscar por nombre, email o servicio…"/>
-      <select id="filterEstado">
-        <option value="">Todos</option>
-        <option value="vigente">Vigentes</option>
-        <option value="pronto">Por vencer (≤7 días)</option>
-        <option value="vencida">Vencidas</option>
-      </select>
-      <div class="menu-wrap theme-switcher">
-        <button type="button" class="btn ghost theme-btn" id="btnTheme" data-menu-toggle aria-haspopup="menu" aria-expanded="false">
-          <span class="theme-btn-label">Tema: <span id="themeLabel">Oscuro</span></span>
-          <span class="theme-btn-icon" aria-hidden="true">▾</span>
-        </button>
-        <div class="menu" id="themeMenu" role="menu">
-          <button class="menu-item" type="button" role="menuitemradio" data-theme-option="dark" aria-checked="true">Oscuro</button>
-          <button class="menu-item" type="button" role="menuitemradio" data-theme-option="light" aria-checked="false">Claro</button>
-        </div>
-      </div>
-      <div class="spacer"></div>
-
-      <!-- Acceso unificado (modal) + cerrar sesión -->
-      <button class="btn ghost" id="btnAuthOpen">Acceder</button>
-      <button class="btn ghost" id="btnLogout" style="display:none">Cerrar sesión</button>
-      <span id="userInfo" class="pill" style="display:none"></span>
-
-      <button class="btn ghost" id="btnChatOpen" title="Abrir chat con Gemini">Chat Gemini</button>
-    </div>
+    <button class="menu-toggle" id="btnMenuToggle" aria-expanded="false" aria-controls="sidebar" aria-label="Abrir menú">☰</button>
   </div>
+
+  <aside class="sidebar" id="sidebar" aria-hidden="true">
+    <div class="sidebar-content">
+      <button class="menu-toggle close" id="btnMenuClose" aria-label="Cerrar menú">×</button>
+      <nav aria-label="Controles principales">
+        <ul class="sidebar-list">
+          <li>
+            <label for="q">Buscar</label>
+            <input id="q" placeholder="Buscar por nombre, email o servicio…"/>
+          </li>
+          <li>
+            <label for="filterEstado">Estado</label>
+            <select id="filterEstado">
+              <option value="">Todos</option>
+              <option value="vigente">Vigentes</option>
+              <option value="pronto">Por vencer (≤7 días)</option>
+              <option value="vencida">Vencidas</option>
+            </select>
+          </li>
+          <li>
+            <div class="menu-wrap theme-switcher">
+              <button type="button" class="btn ghost theme-btn" id="btnTheme" data-menu-toggle aria-haspopup="menu" aria-expanded="false">
+                <span class="theme-btn-label">Tema: <span id="themeLabel">Oscuro</span></span>
+                <span class="theme-btn-icon" aria-hidden="true">▾</span>
+              </button>
+              <div class="menu" id="themeMenu" role="menu">
+                <button class="menu-item" type="button" role="menuitemradio" data-theme-option="dark" aria-checked="true">Oscuro</button>
+                <button class="menu-item" type="button" role="menuitemradio" data-theme-option="light" aria-checked="false">Claro</button>
+              </div>
+            </div>
+          </li>
+          <li class="auth-controls">
+            <button class="btn ghost" id="btnAuthOpen">Acceder</button>
+            <button class="btn ghost" id="btnLogout" style="display:none">Cerrar sesión</button>
+            <span id="userInfo" class="pill" style="display:none"></span>
+          </li>
+          <li>
+            <button class="btn ghost" id="btnChatOpen" title="Abrir chat con Gemini">Chat Gemini</button>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
 
   <div class="wrap">
     <span class="pill">importante</span>
@@ -441,12 +471,39 @@ const f={nombre:$('#nombre'),email:$('#email'),telefono:$('#telefono'),
 servicio:$('#servicio'),inicio:$('#inicio'),vence:$('#vence'),notas:$('#notas'),
 categoria:$('#categoria'), pin:$('#pin')};
 const q=$('#q'), filterEstado=$('#filterEstado'), msg=$('#msg');
+const sidebar=document.getElementById('sidebar');
+const sidebarToggle=document.getElementById('btnMenuToggle');
+const sidebarClose=document.getElementById('btnMenuClose');
+const sidebarBackdrop=document.getElementById('sidebarBackdrop');
 const themeButton=document.getElementById('btnTheme');
 const themeLabel=document.getElementById('themeLabel');
 const themeMenu=document.getElementById('themeMenu');
 const themeOptions=Array.from(themeMenu?.querySelectorAll('[data-theme-option]')||[]);
 const THEME_STORAGE_KEY='ui_theme_mode_v1';
 let editId=null;
+
+function openSidebar(){
+  if(!sidebar) return;
+  sidebar.classList.add('open');
+  sidebar.setAttribute('aria-hidden','false');
+  sidebarToggle?.setAttribute('aria-expanded','true');
+  sidebarBackdrop?.classList.add('visible');
+  sidebarBackdrop?.removeAttribute('hidden');
+}
+
+function closeSidebar(){
+  if(!sidebar) return;
+  sidebar.classList.remove('open');
+  sidebar.setAttribute('aria-hidden','true');
+  sidebarToggle?.setAttribute('aria-expanded','false');
+  sidebarBackdrop?.classList.remove('visible');
+  sidebarBackdrop?.setAttribute('hidden','');
+}
+
+function toggleSidebar(){
+  if(sidebar?.classList.contains('open')) closeSidebar();
+  else openSidebar();
+}
 
 function toast(t){ msg.textContent=t; setTimeout(()=>msg.textContent='',2200); }
 function esc(s){return (s||'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;' }[m]))}
@@ -587,6 +644,18 @@ toggleAuthPass?.addEventListener('click', ()=>{
   authPassEl.type = isPass? 'text':'password';
   toggleAuthPass.textContent = isPass? '🙈':'👁';
 });
+
+sidebarToggle?.addEventListener('click', (e)=>{ e.stopPropagation(); toggleSidebar(); });
+sidebarClose?.addEventListener('click', (e)=>{ e.stopPropagation(); closeSidebar(); });
+sidebarBackdrop?.addEventListener('click', ()=> closeSidebar());
+document.addEventListener('click', (e)=>{
+  if(!sidebar) return;
+  if(!sidebar.classList.contains('open')) return;
+  if(sidebar.contains(e.target)) return;
+  if(e.target===sidebarToggle) return;
+  closeSidebar();
+});
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeSidebar(); });
 
 // ----- Lógica unificada: registrar o iniciar sesión -----
 async function autoSignInOrUp(email, password) {

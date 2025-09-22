@@ -1,16 +1,3 @@
-¡Listo! Te paso el **HTML completo** con los cambios que pediste:
-
-* **Autocompletado contextual por servicio** en:
-
-  * Formulario principal → campo **EMAIL** con botón ▾ y dropdown filtrable al escribir/clic.
-  * Modal **Correos enlazados** → campo **Correo** con botón ▾ y dropdown filtrable al escribir/clic (reemplaza el `datalist` anterior).
-* **Etiquetas (etiquetar/buildEtiqueta)** ya usan `findLinkedAccount(servicio, email)` y si hay contraseña guardada la pone; si no, muestra `—`.
-* **Cierre automático** de menús contextuales: si haces clic **fuera de la fila activa**, se cierran; se mantiene el comportamiento de abrir el menú al hacer clic en la fila.
-* Todo sincronizado con el **servicio seleccionado** y manteniendo el look\&feel de SUPER ZYLO.
-
-> Pega este archivo tal cual sobre tu `index.html`.
-
-````html
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1560,6 +1547,3 @@ renderServicios().then(()=>renderTabla());
 </script>
 </body>
 </html>
-````
-
-Si algo no se comporta exactamente como quieres (por ejemplo, que el dropdown se abra sólo al pulsar ▾ y no al foco, o quieres que el clic en una celda NO abra el menú), dímelo y lo ajusto en caliente.

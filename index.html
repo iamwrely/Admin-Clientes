@@ -208,6 +208,30 @@
     .pin-wrap .eye:hover,.pin-wrap .eye:focus-visible{background:var(--ghost-hover-bg);border-color:var(--ghost-hover-border)}
     .pin-wrap .eye:focus-visible{outline:2px solid rgba(125,211,252,.35);outline-offset:2px}
 
+    .phone-row .phone-control{position:relative;display:flex;align-items:center;gap:0;border:1px solid var(--input-border);border-radius:14px;background:var(--field);box-shadow:inset 0 1px 0 rgba(255,255,255,.06);transition:border-color .15s ease,box-shadow .15s ease,background-color .15s ease}
+    .phone-row .phone-control:focus-within{border-color:var(--input-focus-border);background:var(--field-focus);box-shadow:0 0 0 3px var(--input-focus-shadow)}
+    .phone-row .phone-country{display:flex;align-items:center;gap:8px;height:100%;padding:0 14px;border:0;border-right:1px solid var(--input-border);background:transparent;color:var(--ink);cursor:pointer;font-weight:600}
+    .phone-row .phone-country:hover,.phone-row .phone-country:focus-visible{background:var(--ghost-hover-bg)}
+    .phone-row .phone-country:focus-visible{outline:2px solid rgba(125,211,252,.35);outline-offset:2px}
+    .phone-row .phone-flag{font-size:18px;line-height:1}
+    .phone-row .phone-code{font-size:14px}
+    .phone-row .phone-caret{font-size:10px;margin-left:2px;color:var(--muted)}
+    .phone-row input{border:0;background:transparent;padding:14px 16px;box-shadow:none;color:var(--ink);font-size:15px}
+    .phone-row input:focus{border:0;box-shadow:none}
+    .phone-dropdown{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--menu-bg);border:1px solid var(--ghost-border);border-radius:14px;box-shadow:var(--shadow);max-height:260px;overflow:auto;display:none;z-index:50;padding:6px 0}
+    .phone-dropdown.open{display:block}
+    .phone-option{width:100%;display:flex;align-items:center;gap:12px;padding:10px 16px;border:0;background:transparent;color:var(--ink);cursor:pointer;text-align:left;font-size:14px}
+    .phone-option:hover,.phone-option:focus-visible{background:var(--menu-hover-bg);outline:none}
+    .phone-option[aria-selected="true"]{background:var(--table-row-hover-bg);box-shadow:var(--table-row-hover-shadow)}
+    .phone-option .phone-option-flag{font-size:18px}
+    .phone-option .phone-option-meta{display:flex;justify-content:space-between;gap:12px;flex:1 1 auto;align-items:center}
+    .phone-option .phone-option-name{font-weight:600}
+    .phone-option .phone-option-code{color:var(--muted);font-weight:500}
+    @media(max-width:520px){
+      .phone-row .phone-country{padding:0 10px}
+      .phone-option .phone-option-meta{flex-direction:column;align-items:flex-start;gap:2px}
+    }
+
     /* email dropdown toggle */
     .row.suggestion-source{position:relative}
     .row.suggestion-source input{padding-right:44px}
@@ -446,9 +470,17 @@
           <div id="emailSuggestionDropdown" class="suggestion-dropdown" role="listbox" aria-hidden="true"></div>
         </div>
 
-        <div class="row">
+        <div class="row phone-row">
           <label for="telefono">Teléfono</label>
-          <input id="telefono" placeholder="+51 …"/>
+          <div class="phone-control" id="phoneControl">
+            <button type="button" class="phone-country" id="phoneCountry" aria-haspopup="listbox" aria-expanded="false" aria-label="Selecciona el país">
+              <span class="phone-flag" id="phoneFlag" aria-hidden="true">🇵🇪</span>
+              <span class="phone-code" id="phoneDialLabel">+51</span>
+              <span class="phone-caret" aria-hidden="true">▾</span>
+            </button>
+            <input id="telefono" type="tel" placeholder="Introduce el número" autocomplete="tel" inputmode="tel" aria-describedby="phoneDialLabel" />
+            <div class="phone-dropdown" id="phoneDropdown" role="listbox" aria-label="Selecciona el país" aria-hidden="true"></div>
+          </div>
         </div>
         <div class="row">
           <label for="inicio">Fecha</label>
@@ -628,6 +660,188 @@ const THEME_STORAGE_KEY='ui_theme_mode_v1';
 
 let editId=null;
 
+/* ===== Teléfono con selector de país ===== */
+const phoneControl=$('#phoneControl');
+const phoneCountryButton=document.getElementById('phoneCountry');
+const phoneDropdown=document.getElementById('phoneDropdown');
+const phoneFlag=document.getElementById('phoneFlag');
+const phoneDialLabel=document.getElementById('phoneDialLabel');
+const phoneInput=f.telefono;
+
+const phoneCountriesRaw=[
+  {name:'Afganistán',dial:'+93',flag:'🇦🇫'},
+  {name:'Albania',dial:'+355',flag:'🇦🇱'},
+  {name:'Alemania',dial:'+49',flag:'🇩🇪'},
+  {name:'Andorra',dial:'+376',flag:'🇦🇩'},
+  {name:'Angola',dial:'+244',flag:'🇦🇴'},
+  {name:'Anguila',dial:'+1 264',flag:'🇦🇮'},
+  {name:'Antigua y Barbuda',dial:'+1 268',flag:'🇦🇬'},
+  {name:'Arabia Saudí',dial:'+966',flag:'🇸🇦'},
+  {name:'Argelia',dial:'+213',flag:'🇩🇿'},
+  {name:'Argentina',dial:'+54',flag:'🇦🇷'},
+  {name:'Armenia',dial:'+374',flag:'🇦🇲'},
+  {name:'Aruba',dial:'+297',flag:'🇦🇼'},
+  {name:'Australia',dial:'+61',flag:'🇦🇺'},
+  {name:'Austria',dial:'+43',flag:'🇦🇹'},
+  {name:'Azerbaiyán',dial:'+994',flag:'🇦🇿'},
+  {name:'Bahamas',dial:'+1 242',flag:'🇧🇸'},
+  {name:'Bangladés',dial:'+880',flag:'🇧🇩'},
+  {name:'Baréin',dial:'+973',flag:'🇧🇭'},
+  {name:'Barbados',dial:'+1 246',flag:'🇧🇧'},
+  {name:'Bélgica',dial:'+32',flag:'🇧🇪'},
+  {name:'Belice',dial:'+501',flag:'🇧🇿'},
+  {name:'Benín',dial:'+229',flag:'🇧🇯'},
+  {name:'Bermudas',dial:'+1 441',flag:'🇧🇲'},
+  {name:'Bolivia',dial:'+591',flag:'🇧🇴'},
+  {name:'Bosnia y Herzegovina',dial:'+387',flag:'🇧🇦'},
+  {name:'Botsuana',dial:'+267',flag:'🇧🇼'},
+  {name:'Brasil',dial:'+55',flag:'🇧🇷'},
+  {name:'Canadá',dial:'+1',flag:'🇨🇦'},
+  {name:'Chile',dial:'+56',flag:'🇨🇱'},
+  {name:'China',dial:'+86',flag:'🇨🇳'},
+  {name:'Colombia',dial:'+57',flag:'🇨🇴'},
+  {name:'Costa Rica',dial:'+506',flag:'🇨🇷'},
+  {name:'Cuba',dial:'+53',flag:'🇨🇺'},
+  {name:'Ecuador',dial:'+593',flag:'🇪🇨'},
+  {name:'Egipto',dial:'+20',flag:'🇪🇬'},
+  {name:'El Salvador',dial:'+503',flag:'🇸🇻'},
+  {name:'España',dial:'+34',flag:'🇪🇸'},
+  {name:'Estados Unidos',dial:'+1',flag:'🇺🇸'},
+  {name:'Francia',dial:'+33',flag:'🇫🇷'},
+  {name:'Grecia',dial:'+30',flag:'🇬🇷'},
+  {name:'Guatemala',dial:'+502',flag:'🇬🇹'},
+  {name:'Honduras',dial:'+504',flag:'🇭🇳'},
+  {name:'India',dial:'+91',flag:'🇮🇳'},
+  {name:'Italia',dial:'+39',flag:'🇮🇹'},
+  {name:'Japón',dial:'+81',flag:'🇯🇵'},
+  {name:'México',dial:'+52',flag:'🇲🇽'},
+  {name:'Panamá',dial:'+507',flag:'🇵🇦'},
+  {name:'Paraguay',dial:'+595',flag:'🇵🇾'},
+  {name:'Perú',dial:'+51',flag:'🇵🇪'},
+  {name:'Portugal',dial:'+351',flag:'🇵🇹'},
+  {name:'Reino Unido',dial:'+44',flag:'🇬🇧'},
+  {name:'República Dominicana',dial:'+1 809',flag:'🇩🇴'},
+  {name:'Uruguay',dial:'+598',flag:'🇺🇾'},
+  {name:'Venezuela',dial:'+58',flag:'🇻🇪'}
+];
+const phoneCountries=phoneCountriesRaw.map(c=>({
+  ...c,
+  dialDigits:(c.dial||'').replace(/\D+/g,'')
+})).sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+const phoneCountriesByDialLength=phoneCountries.slice().sort((a,b)=>b.dialDigits.length-a.dialDigits.length);
+const defaultPhoneCountry=phoneCountries.find(c=>c.dialDigits==='51')||phoneCountries[0]||null;
+let selectedPhoneCountry=defaultPhoneCountry;
+
+function renderPhoneCountryOptions(){
+  if(!phoneDropdown) return;
+  phoneDropdown.innerHTML=phoneCountries.map(c=>`
+    <button type="button" class="phone-option" role="option" data-dial-digits="${c.dialDigits}">
+      <span class="phone-option-flag" aria-hidden="true">${c.flag}</span>
+      <span class="phone-option-meta">
+        <span class="phone-option-name">${c.name}</span>
+        <span class="phone-option-code">${c.dial}</span>
+      </span>
+    </button>
+  `).join('');
+}
+function resolvePhoneCountry(target){
+  if(!target) return null;
+  if(typeof target==='object' && target.dialDigits) return target;
+  const digits=String(target).replace(/\D+/g,'');
+  if(!digits) return null;
+  return phoneCountries.find(c=>c.dialDigits===digits)||null;
+}
+function updatePhoneButtonAccessibility(country){
+  if(!phoneCountryButton||!country) return;
+  phoneCountryButton.setAttribute('aria-label',`Código de país: ${country.name} (${country.dial})`);
+  phoneCountryButton.dataset.dialDigits=country.dialDigits;
+}
+function setSelectedPhoneCountry(target,{resetInput=false}={}){
+  const country=resolvePhoneCountry(target)||defaultPhoneCountry||null;
+  if(!country) return;
+  selectedPhoneCountry=country;
+  if(phoneFlag) phoneFlag.textContent=country.flag;
+  if(phoneDialLabel) phoneDialLabel.textContent=country.dial;
+  updatePhoneButtonAccessibility(country);
+  if(phoneDropdown){
+    phoneDropdown.querySelectorAll('.phone-option').forEach(btn=>{
+      btn.setAttribute('aria-selected',btn.dataset.dialDigits===country.dialDigits?'true':'false');
+    });
+  }
+  if(resetInput && phoneInput) phoneInput.value='';
+}
+function formatPhoneDisplay(digits){
+  if(!digits) return '';
+  return digits.replace(/(\d{3})(?=\d)/g,'$1 ').trim();
+}
+function parsePhoneValue(raw){
+  const digits=(raw||'').toString().replace(/\D+/g,'');
+  if(!digits) return {country:null,number:''};
+  const match=phoneCountriesByDialLength.find(c=>digits.startsWith(c.dialDigits));
+  if(match) return {country:match,number:digits.slice(match.dialDigits.length)};
+  return {country:null,number:digits};
+}
+function getPhoneValue(){
+  if(!phoneInput||!selectedPhoneCountry) return '';
+  const digits=phoneInput.value.replace(/\D+/g,'');
+  if(!digits) return '';
+  const formatted=formatPhoneDisplay(digits);
+  return `${selectedPhoneCountry.dial} ${formatted}`.trim();
+}
+function applyPhoneValue(raw){
+  const {country,number}=parsePhoneValue(raw||'');
+  setSelectedPhoneCountry(country||defaultPhoneCountry,{resetInput:true});
+  if(phoneInput) phoneInput.value=formatPhoneDisplay(number);
+}
+function resetPhoneInput(){
+  setSelectedPhoneCountry(defaultPhoneCountry,{resetInput:true});
+}
+function setPhoneDropdownOpen(open){
+  if(!phoneDropdown||!phoneCountryButton) return;
+  if(open){
+    phoneDropdown.classList.add('open');
+    phoneDropdown.setAttribute('aria-hidden','false');
+    phoneCountryButton.setAttribute('aria-expanded','true');
+    const active=phoneDropdown.querySelector('.phone-option[aria-selected="true"]');
+    active?.scrollIntoView({block:'nearest'});
+  }else{
+    phoneDropdown.classList.remove('open');
+    phoneDropdown.setAttribute('aria-hidden','true');
+    phoneCountryButton.setAttribute('aria-expanded','false');
+  }
+}
+
+renderPhoneCountryOptions();
+if(defaultPhoneCountry) setSelectedPhoneCountry(defaultPhoneCountry,{resetInput:true});
+setPhoneDropdownOpen(false);
+
+phoneInput?.addEventListener('input',()=>{
+  const digits=phoneInput.value.replace(/\D+/g,'');
+  phoneInput.value=formatPhoneDisplay(digits);
+});
+phoneCountryButton?.addEventListener('click',()=>{
+  const isOpen=phoneDropdown?.classList.contains('open');
+  setPhoneDropdownOpen(!isOpen);
+});
+phoneDropdown?.addEventListener('click',e=>{
+  const option=e.target.closest('.phone-option');
+  if(!option) return;
+  const digits=option.dataset.dialDigits;
+  const country=resolvePhoneCountry(digits);
+  setSelectedPhoneCountry(country);
+  setPhoneDropdownOpen(false);
+  phoneInput?.focus();
+});
+document.addEventListener('click',e=>{
+  if(!phoneControl) return;
+  if(phoneControl.contains(e.target)) return;
+  setPhoneDropdownOpen(false);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') setPhoneDropdownOpen(false);
+});
+
+
 /* ===== Dropdown EMAIL (form principal) ===== */
 const emailSuggestionDropdown = document.getElementById('emailSuggestionDropdown');
 const emailDropdownToggle = document.getElementById('emailDropdownToggle');
@@ -793,7 +1007,11 @@ function estadoDe(vence){
 }
 function limpiar(){
   editId=null;
-  for(const k in f){ if('value' in f[k]) f[k].value=''; }
+  for(const k in f){
+    if(k==='telefono') continue;
+    if('value' in f[k]) f[k].value='';
+  }
+  resetPhoneInput();
   Promise.resolve(renderServicios()).then(()=>{
     rebuildEmailSuggestions();
     handleEmailSuggestionSelection();
@@ -1363,7 +1581,7 @@ btnLinkedDelete?.addEventListener('click', ()=>{
 /* ===== Acciones tabla ===== */
 $('#btnGuardar').onclick = async ()=>{
   const data={
-    nombre:f.nombre.value.trim(), email:f.email.value.trim(), telefono:f.telefono.value.trim(),
+    nombre:f.nombre.value.trim(), email:f.email.value.trim(), telefono:getPhoneValue(),
     servicio:f.servicio.value, inicio:f.inicio.value, vence:f.vence.value,
     categoria:f.categoria.value, notas:f.notas.value.trim(), pin:f.pin.value.trim(), ts:Date.now()
   };
@@ -1377,7 +1595,11 @@ $('#btnGuardar').onclick = async ()=>{
 };
 function editar(id){
   const x=db.getAll().find(c=>c.id===id); if(!x) return; editId=x.id;
-  for(const k in f){ if(k in x) f[k].value=x[k]||''; }
+  for(const k in f){
+    if(k==='telefono') continue;
+    if(k in x) f[k].value=x[k]||'';
+  }
+  applyPhoneValue(x.telefono);
   msg.textContent='Editando… guarda para aplicar cambios';
 }
 async function borrar(id){

@@ -37,12 +37,13 @@
       --ai-bubble-border:rgba(255,255,255,.12);
       --eye-bg:rgba(255,255,255,.08);
       --eye-border:rgba(255,255,255,.18);
-      --addserv-bg:rgba(255,255,255,.04);
-      --addserv-border:rgba(255,255,255,.26);
-      --addserv-hover-bg:rgba(242,138,45,.16);
-      --addserv-hover-border:rgba(242,138,45,.4);
-      --addserv-active-bg:rgba(242,138,45,.24);
-      --addserv-active-border:rgba(242,138,45,.5);
+      --addserv-bg:rgba(125,211,252,.18);
+      --addserv-border:rgba(125,211,252,.55);
+      --addserv-hover-bg:rgba(125,211,252,.26);
+      --addserv-hover-border:rgba(125,211,252,.65);
+      --addserv-active-bg:rgba(125,211,252,.32);
+      --addserv-active-border:rgba(125,211,252,.75);
+      --addserv-ink:#e0f2fe;
       --tag-border:rgba(255,255,255,.2);
       --tag-bg:rgba(255,255,255,.05);
     }
@@ -96,12 +97,13 @@
       --ai-bubble-border:rgba(148,163,184,.4);
       --eye-bg:#e2e8f0;
       --eye-border:rgba(148,163,184,.7);
-      --addserv-bg:#e2e8f0;
-      --addserv-border:rgba(148,163,184,.6);
-      --addserv-hover-bg:rgba(59,130,246,.15);
-      --addserv-hover-border:rgba(59,130,246,.45);
-      --addserv-active-bg:rgba(59,130,246,.22);
-      --addserv-active-border:rgba(37,99,235,.6);
+      --addserv-bg:rgba(191,219,254,.85);
+      --addserv-border:rgba(59,130,246,.45);
+      --addserv-hover-bg:rgba(191,219,254,.95);
+      --addserv-hover-border:rgba(59,130,246,.55);
+      --addserv-active-bg:rgba(191,219,254,1);
+      --addserv-active-border:rgba(37,99,235,.65);
+      --addserv-ink:#1d4ed8;
       --tag-border:rgba(148,163,184,.6);
       --tag-bg:#e2e8f0;
     }
@@ -163,17 +165,19 @@
     }
 
     /* ===== Servicio centrado ===== */
-    .center{display:flex;justify-content:center;align-items:center;gap:10px;margin:8px 0 20px;flex-wrap:wrap}
-    .center > *{flex:1 1 auto;min-width:140px}
-    .center .label{flex:0 0 auto}
-    .center select{flex:1 1 240px;min-width:180px}
+    .center{display:flex;justify-content:center;align-items:center;column-gap:10px;row-gap:16px;margin:8px 0 20px;flex-wrap:wrap}
+    .center > *{flex:0 0 auto}
     .center button{flex:0 0 auto}
-    .center .label{color:var(--ink-soft)}
-    .addserv{border:1px dashed rgba(255,255,255,.26);background:rgba(255,255,255,.04);color:var(--ink);padding:8px 12px;border-radius:12px;font-size:15px;min-width:40px;text-align:center;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .2s ease,color .2s ease}
-    .addserv:hover,.addserv:focus-visible{background:rgba(242,138,45,.16);border-color:rgba(242,138,45,.4);box-shadow:0 10px 24px rgba(5,9,15,.4);transform:translateY(-1px)}
-    .addserv:active{background:rgba(242,138,45,.24);border-color:rgba(242,138,45,.5);transform:translateY(0);box-shadow:0 6px 16px rgba(5,9,15,.6)}
-    .addserv:focus-visible{outline:2px solid rgba(242,138,45,.35);outline-offset:2px}
-    .addserv.remove{border-color:rgba(251,113,133,.45);color:#fecdd3;background:rgba(248,113,113,.16)}
+    .center .service-group{display:flex;align-items:center;gap:8px;flex:1 1 320px;justify-content:center}
+    .center .service-group .label{color:var(--ink);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:14px}
+    .center .service-group select{flex:1 1 240px;min-width:200px}
+    .addserv{border:1px solid var(--addserv-border);background:var(--addserv-bg);color:var(--addserv-ink);width:44px;height:44px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;line-height:1;cursor:pointer;transition:background-color .2s ease,border-color .2s ease,box-shadow .2s ease,transform .2s ease,color .2s ease;box-shadow:0 12px 28px rgba(5,9,15,.35)}
+    .addserv:hover,.addserv:focus-visible{background:var(--addserv-hover-bg);border-color:var(--addserv-hover-border);box-shadow:0 16px 32px rgba(5,9,15,.38);transform:translateY(-1px)}
+    .addserv:active{background:var(--addserv-active-bg);border-color:var(--addserv-active-border);transform:translateY(0);box-shadow:0 10px 22px rgba(5,9,15,.5)}
+    .addserv:focus-visible{outline:2px solid rgba(125,211,252,.55);outline-offset:2px}
+    .addserv.remove{border-color:rgba(251,113,133,.45);color:#fecdd3;background:rgba(248,113,113,.18)}
+    .addserv.remove:hover,.addserv.remove:focus-visible{background:rgba(248,113,113,.26);border-color:rgba(251,113,133,.55)}
+    .addserv.remove:active{background:rgba(248,113,113,.32);border-color:rgba(251,113,133,.65)}
 
     /* ===== Form (labels arriba) ===== */
     .form{background:rgba(255,255,255,.06);border-radius:20px;border:1px solid var(--border);padding:28px;box-shadow:var(--shadow);backdrop-filter:blur(22px)}
@@ -417,8 +421,10 @@
   </header>
 
   <section id="BarraServicio" class="center scroll-fade">
-    <div class="label">Servicio</div>
-    <select id="servicio" style="max-width:260px"></select>
+    <div class="service-group">
+      <label class="label service-label" for="servicio">SERVICIO</label>
+      <select id="servicio" style="max-width:260px"></select>
+    </div>
     <button id="btnAgregarServicio" class="addserv" aria-label="Agregar servicio" title="Agregar servicio">+</button>
     <button id="btnEliminarServicio" class="addserv remove" aria-label="Eliminar servicio" title="Eliminar servicio">−</button>
   </section>

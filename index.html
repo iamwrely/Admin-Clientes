@@ -112,7 +112,6 @@
       filter:none;
       transform:none;
     }
-    body.theme-light .hero-brand{background:#f4f7f6;color:#0f2f1f;box-shadow:0 14px 32px rgba(15,23,42,.12)}
     a{color:inherit}
 
     body.sidebar-expanded{padding-left:260px}
@@ -158,12 +157,9 @@
       #AppGrid{grid-template-columns:minmax(0,2fr)minmax(0,1fr);grid-template-areas:"form acciones" "tabla tabla";}
     }
     .pill{display:block;width:max-content;margin:0 auto 14px;padding:6px 14px;border-radius:999px;background:var(--pill-bg);color:var(--pill-ink);border:1px solid var(--border);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
-    .hero-brand{display:flex;align-items:center;justify-content:center;gap:clamp(12px,4vw,32px);margin:12px auto 32px;padding:clamp(16px,4vw,32px) clamp(22px,6vw,48px);border-radius:48px;text-align:center;background:rgba(241,245,243,.92);color:#0f2f1f;box-shadow:0 22px 44px rgba(0,0,0,.45)}
-    .hero-brand img{width:clamp(56px,16vw,128px);height:auto;flex-shrink:0;filter:none}
-    .hero-brand span{display:block;font-weight:600;letter-spacing:-0.04em;font-size:clamp(38px,14vw,112px);line-height:1;text-shadow:none;text-transform:none}
+    .hero-brand{margin:12px auto 32px;font-weight:700;letter-spacing:-0.04em;font-size:clamp(38px,14vw,112px);line-height:1;text-align:center;color:var(--ink);text-shadow:none}
     @media(max-width:520px){
-      .hero-brand{padding:18px 28px}
-      .hero-brand span{font-size:clamp(32px,18vw,72px)}
+      .hero-brand{font-size:clamp(32px,18vw,72px)}
     }
 
     /* ===== Servicio centrado ===== */
@@ -386,10 +382,7 @@
 
   <header id="Header" class="scroll-fade">
     <span class="pill">importante</span>
-    <div class="hero-brand" role="heading" aria-level="1">
-      <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%230f2f1f' d='M54 6C32 6 10 24 10 46c0 5.6 1.2 10.5 3.3 14.5 15.4-1.7 27.5-9.1 36.5-21.2C55.7 29.5 58.8 20.3 60 9.5 58.5 7 56.5 6.1 54 6z'/%3E%3Cpath fill='none' stroke='%230f2f1f' stroke-width='4' stroke-linecap='round' stroke-linejoin='round' d='M20 46c10-6 22-18 30-32'/%3E%3C/svg%3E" alt="Hoja Super Zylo" loading="lazy"/>
-      <span>Super Zylo</span>
-    </div>
+    <h1 class="hero-brand">ZYLO</h1>
   </header>
 
   <section id="BarraServicio" class="center scroll-fade">
